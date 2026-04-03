@@ -1,0 +1,21 @@
+{
+  "name": "Obsidian Ledger",
+  "short_name": "Obsidian",
+  "description": "A premium budget tracking application with SMS sync and glassmorphism UI.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#ba9eff",
+  "icons": [
+    {
+      "src": "https://api.dicebear.com/7.x/shapes/svg?seed=Obsidian&backgroundColor=ba9eff",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "https://api.dicebear.com/7.x/shapes/svg?seed=Obsidian&backgroundColor=ba9eff",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
