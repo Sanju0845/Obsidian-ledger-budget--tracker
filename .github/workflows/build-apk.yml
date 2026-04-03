@@ -45,8 +45,20 @@ jobs:
         working-directory: ./android
         run: ./gradlew assembleRelease
 
-      - name: Upload Release APK
+      - name: Sign APK
+        working-directory: ./android
+        run: |
+          # Create debug keystore for signing
+          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          
+          # Sign the APK
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore debug.keystore -storepass android app/build/outputs/apk/release/app-release-unsigned.apk androiddebugkey
+          
+          # Align the APK
+          zipalign -v 4 app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/app-release-signed.apk
+
+      - name: Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: release-apk
-          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+          name: release-apk-signed
+          path: android/app/build/outputs/apk/release/app-release-signed.apk
