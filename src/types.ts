@@ -80,6 +80,21 @@ export const BANK_LOGOS: Record<string, string> = {
   canarabank: 'https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/logos/canara.png',
 };
 
+export interface UPIAccount {
+  id: string;
+  upiId: string;
+  bankName: string;
+  accountNumber: string;
+  balance: number;
+  isDefault: boolean;
+}
+
+export interface Bank {
+  id: string;
+  name: string;
+  logo: string;
+}
+
 export const CARD_COLORS = [
   'from-[#ba9eff] to-[#8455ef]',
   'from-[#699cff] to-[#005ac2]',

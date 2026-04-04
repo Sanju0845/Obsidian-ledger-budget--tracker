@@ -68,8 +68,9 @@ import {
   Legend
 } from 'recharts';
 import { cn } from './lib/utils';
-import { Transaction, Card, Budget, UserProfile, Notification, BANK_LOGOS, CARD_COLORS, SavingsGoal } from './types';
+import { Transaction, Card, Budget, UserProfile, Notification, BANK_LOGOS, CARD_COLORS, SavingsGoal, UPIAccount, Bank } from './types';
 import { GoogleGenAI } from "@google/genai";
+import { Html5QrcodeScanner } from "html5-qrcode";
 
 // --- Constants & Mock Data ---
 const INITIAL_CARDS: Card[] = [];
@@ -95,6 +96,14 @@ const INITIAL_PROFILE: UserProfile = {
 const INITIAL_SAVINGS: SavingsGoal[] = [
   { id: '1', name: 'New iPhone', targetAmount: 80000, currentAmount: 15000, color: '#ba9eff', icon: 'ShoppingBag' },
   { id: '2', name: 'Europe Trip', targetAmount: 250000, currentAmount: 45000, color: '#699cff', icon: 'Plane' },
+];
+
+const AVAILABLE_BANKS: Bank[] = [
+  { id: 'sbi', name: 'State Bank of India', logo: BANK_LOGOS.sbi },
+  { id: 'hdfc', name: 'HDFC Bank', logo: BANK_LOGOS.hdfc },
+  { id: 'icici', name: 'ICICI Bank', logo: BANK_LOGOS.icici },
+  { id: 'axis', name: 'Axis Bank', logo: BANK_LOGOS.axis },
+  { id: 'kotak', name: 'Kotak Mahindra Bank', logo: BANK_LOGOS.kotak },
 ];
 
 const CATEGORY_ICONS: Record<string, any> = {
@@ -711,7 +720,7 @@ const BottomNavBar = ({ activeTab, onTabChange }: { activeTab: string, onTabChan
   const tabs = [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'budget', label: 'Budget', icon: Wallet },
-    { id: 'savings', label: 'Savings', icon: Target },
+    { id: 'upi', label: 'UPI', icon: Scan },
     { id: 'transactions', label: 'Ledger', icon: ReceiptText },
     { id: 'profile', label: 'Settings', icon: Settings },
   ];
@@ -753,6 +762,210 @@ const BottomNavBar = ({ activeTab, onTabChange }: { activeTab: string, onTabChan
   );
 };
 
+// --- UPI Components ---
+
+const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClose: () => void }) => {
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+
+  useEffect(() => {
+    scannerRef.current = new Html5QrcodeScanner(
+      "reader",
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      /* verbose= */ false
+    );
+    scannerRef.current.render(
+      (decodedText) => {
+        onScan(decodedText);
+        scannerRef.current?.clear();
+      },
+      (error) => {
+        // console.warn(error);
+      }
+    );
+
+    return () => {
+      scannerRef.current?.clear();
+    };
+  }, [onScan]);
+
+  return (
+    <div className="fixed inset-0 z-[150] bg-black flex flex-col items-center justify-center p-6">
+      <div className="w-full flex justify-between items-center mb-8">
+        <h2 className="text-white font-headline text-2xl font-bold">Scan QR Code</h2>
+        <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white">
+          <X size={20} />
+        </button>
+      </div>
+      <div id="reader" className="w-full max-w-sm rounded-3xl overflow-hidden border-2 border-primary/50" />
+      <p className="text-white/60 text-center mt-8 text-sm">Align the QR code within the frame to scan</p>
+    </div>
+  );
+};
+
+const UPIPaymentModal = ({ 
+  upiData, 
+  accounts, 
+  onPay, 
+  onClose,
+  currency 
+}: { 
+  upiData: { upiId: string, name?: string, amount?: string }, 
+  accounts: UPIAccount[], 
+  onPay: (amount: number, accountId: string) => void, 
+  onClose: () => void,
+  currency: string
+}) => {
+  const [amount, setAmount] = useState(upiData.amount || '');
+  const [selectedAccountId, setSelectedAccountId] = useState(accounts.find(a => a.isDefault)?.id || accounts[0]?.id);
+  const [isPaying, setIsPaying] = useState(false);
+
+  const handlePay = () => {
+    if (!amount || !selectedAccountId) return;
+    setIsPaying(true);
+    setTimeout(() => {
+      onPay(parseFloat(amount), selectedAccountId);
+      setIsPaying(false);
+    }, 1500);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center py-4">
+        <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+          <ArrowUpRight size={32} className="text-primary" />
+        </div>
+        <h3 className="font-headline text-xl font-bold">{upiData.name || 'Paying to'}</h3>
+        <p className="text-on-surface-variant text-sm">{upiData.upiId}</p>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-[10px] uppercase font-bold text-on-surface-variant tracking-widest ml-1">Amount</label>
+        <div className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-primary">
+            {currency === 'INR' ? '₹' : '$'}
+          </span>
+          <input 
+            type="number" 
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.00"
+            className="w-full bg-surface-container h-16 rounded-2xl pl-12 pr-4 text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-[10px] uppercase font-bold text-on-surface-variant tracking-widest ml-1">Pay From</label>
+        <div className="space-y-2">
+          {accounts.map(acc => (
+            <button 
+              key={acc.id}
+              onClick={() => setSelectedAccountId(acc.id)}
+              className={cn(
+                "w-full p-4 rounded-2xl border flex items-center justify-between transition-all",
+                selectedAccountId === acc.id ? "bg-primary/10 border-primary" : "bg-surface-container border-transparent"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+                  <Wallet size={20} className="text-primary" />
+                </div>
+                <div className="text-left">
+                  <p className="font-bold text-sm">{acc.bankName}</p>
+                  <p className="text-[10px] text-on-surface-variant">{acc.upiId}</p>
+                </div>
+              </div>
+              {selectedAccountId === acc.id && <Check size={20} className="text-primary" />}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <button 
+        disabled={!amount || isPaying}
+        onClick={handlePay}
+        className="w-full h-14 bg-primary text-surface rounded-2xl font-bold text-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale transition-all active:scale-95"
+      >
+        {isPaying ? (
+          <motion.div 
+            animate={{ rotate: 360 }} 
+            transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+            className="w-6 h-6 border-2 border-surface border-t-transparent rounded-full"
+          />
+        ) : (
+          <>
+            <Zap size={20} />
+            Pay Now
+          </>
+        )}
+      </button>
+    </div>
+  );
+};
+
+const UPIManagement = ({ accounts, onAdd, onDelete, onSetDefault }: { accounts: UPIAccount[], onAdd: () => void, onDelete: (id: string) => void, onSetDefault: (id: string) => void }) => {
+  return (
+    <div className="space-y-8 pb-32">
+      <div>
+        <h1 className="font-headline text-4xl font-bold">UPI Accounts</h1>
+        <p className="text-on-surface-variant text-sm">Manage your linked bank accounts</p>
+      </div>
+
+      <div className="space-y-4">
+        {accounts.map(acc => (
+          <div key={acc.id} className="bg-surface-container-low p-6 rounded-[32px] border border-white/5 shadow-xl">
+            <div className="flex justify-between items-start mb-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                  <Wallet size={24} />
+                </div>
+                <div>
+                  <h3 className="font-headline font-bold text-lg">{acc.bankName}</h3>
+                  <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest">{acc.upiId}</p>
+                </div>
+              </div>
+              {acc.isDefault && (
+                <span className="bg-primary/20 text-primary text-[8px] font-bold px-2 py-1 rounded-full uppercase tracking-widest">Default</span>
+              )}
+            </div>
+
+            <div className="flex justify-between items-end">
+              <div>
+                <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-1">Balance</p>
+                <p className="text-xl font-bold">₹{acc.balance.toLocaleString()}</p>
+              </div>
+              <div className="flex gap-2">
+                {!acc.isDefault && (
+                  <button 
+                    onClick={() => onSetDefault(acc.id)}
+                    className="p-2 rounded-full bg-white/5 text-on-surface-variant hover:text-primary transition-colors"
+                  >
+                    <Check size={20} />
+                  </button>
+                )}
+                <button 
+                  onClick={() => onDelete(acc.id)}
+                  className="p-2 rounded-full bg-white/5 text-on-surface-variant hover:text-error transition-colors"
+                >
+                  <Trash2 size={20} />
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+
+        <button 
+          onClick={onAdd}
+          className="w-full h-32 rounded-[32px] border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-2 text-on-surface-variant hover:text-white hover:border-white/20 transition-all"
+        >
+          <Plus size={24} />
+          <span className="font-bold">Link New Bank Account</span>
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // --- Main App ---
 
 export default function App() {
@@ -772,6 +985,10 @@ export default function App() {
     const saved = localStorage.getItem('obsidian_savings');
     return saved ? JSON.parse(saved) : INITIAL_SAVINGS;
   });
+  const [upiAccounts, setUpiAccounts] = useState<UPIAccount[]>(() => {
+    const saved = localStorage.getItem('obsidian_upi_accounts');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [activeTab, setActiveTab] = useState('home');
@@ -780,6 +997,10 @@ export default function App() {
   const [showSmsModal, setShowSmsModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showBudgetModal, setShowBudgetModal] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [showUPIPaymentModal, setShowUPIPaymentModal] = useState(false);
+  const [showAddUPIModal, setShowAddUPIModal] = useState(false);
+  const [scannedUPI, setScannedUPI] = useState<{ upiId: string, name?: string, amount?: string } | null>(null);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [smsText, setSmsText] = useState('');
   const [isParsing, setIsParsing] = useState(false);
@@ -840,6 +1061,10 @@ export default function App() {
   }, [smsSyncEnabled]);
 
   useEffect(() => {
+    localStorage.setItem('obsidian_upi_accounts', JSON.stringify(upiAccounts));
+  }, [upiAccounts]);
+
+  useEffect(() => {
     // Apply theme to document
     if (profile.theme === 'light') {
       document.documentElement.classList.remove('dark');
@@ -878,6 +1103,89 @@ export default function App() {
 
   const [showSplitModal, setShowSplitModal] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
+
+  // UPI Handlers
+  const handleQRScan = useCallback((data: string) => {
+    // UPI QR format: upi://pay?pa=address&pn=name&am=amount&cu=currency&tn=note
+    try {
+      const url = new URL(data);
+      if (url.protocol === 'upi:') {
+        const params = new URLSearchParams(url.search);
+        const upiId = params.get('pa') || '';
+        const name = params.get('pn') || '';
+        const amount = params.get('am') || '';
+        
+        if (upiId) {
+          setScannedUPI({ upiId, name, amount });
+          setShowQRScanner(false);
+          setShowUPIPaymentModal(true);
+        }
+      } else {
+        // Handle generic text or other formats
+        setScannedUPI({ upiId: data });
+        setShowQRScanner(false);
+        setShowUPIPaymentModal(true);
+      }
+    } catch (e) {
+      // Fallback for non-URL QR codes
+      setScannedUPI({ upiId: data });
+      setShowQRScanner(false);
+      setShowUPIPaymentModal(true);
+    }
+  }, []);
+
+  const handleUPIPay = (amount: number, accountId: string) => {
+    const account = upiAccounts.find(a => a.id === accountId);
+    if (!account || account.balance < amount) {
+      // Handle error
+      return;
+    }
+
+    // Deduct from UPI account
+    setUpiAccounts(prev => prev.map(a => 
+      a.id === accountId ? { ...a, balance: a.balance - amount } : a
+    ));
+
+    // Add transaction
+    const newTransaction: Transaction = {
+      id: Math.random().toString(36).substr(2, 9),
+      amount,
+      type: 'expense',
+      category: 'UPI Payment',
+      merchant: scannedUPI?.name || scannedUPI?.upiId || 'UPI Transfer',
+      date: new Date().toISOString(),
+      cardId: 'upi', // Special ID for UPI transactions
+      description: `UPI Payment to ${scannedUPI?.upiId}`
+    };
+    setTransactions(prev => [newTransaction, ...prev]);
+
+    // Add notification
+    const newNotif: Notification = {
+      id: Math.random().toString(36).substr(2, 9),
+      title: 'UPI Payment Successful',
+      message: `Paid ${formatCurrency(amount, profile.currency)} to ${scannedUPI?.upiId}`,
+      time: new Date().toISOString(),
+      read: false,
+      type: 'transaction'
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+
+    setShowUPIPaymentModal(false);
+    setScannedUPI(null);
+  };
+
+  const addUPIAccount = (bank: Bank, upiId: string) => {
+    const newAccount: UPIAccount = {
+      id: Math.random().toString(36).substr(2, 9),
+      upiId,
+      bankName: bank.name,
+      accountNumber: `XXXX${Math.floor(1000 + Math.random() * 9000)}`,
+      balance: 10000 + Math.floor(Math.random() * 50000), // Mock balance
+      isDefault: upiAccounts.length === 0
+    };
+    setUpiAccounts(prev => [...prev, newAccount]);
+    setShowAddUPIModal(false);
+  };
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
@@ -1189,26 +1497,33 @@ export default function App() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-10">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-10">
+              <button 
+                onClick={() => setShowQRScanner(true)}
+                className="glass-header rounded-xl py-4 flex flex-col items-center justify-center gap-2 hover:bg-surface-container transition-colors border-primary/20 border"
+              >
+                <Scan className="text-primary" size={20} />
+                <span className="font-label text-[10px] font-bold text-on-surface uppercase tracking-wider">Scan & Pay</span>
+              </button>
               <button 
                 onClick={() => setShowSmsModal(true)}
                 className="glass-header rounded-xl py-4 flex flex-col items-center justify-center gap-2 hover:bg-surface-container transition-colors"
               >
-                <Scan className="text-primary" size={20} />
+                <Upload className="text-secondary" size={20} />
                 <span className="font-label text-[10px] font-bold text-on-surface uppercase tracking-wider">Sync SMS</span>
               </button>
               <button 
                 onClick={() => setShowAddModal(true)}
                 className="glass-header rounded-xl py-4 flex flex-col items-center justify-center gap-2 hover:bg-surface-container transition-colors"
               >
-                <PlusCircle className="text-secondary" size={20} />
+                <PlusCircle className="text-tertiary" size={20} />
                 <span className="font-label text-[10px] font-bold text-on-surface uppercase tracking-wider">Add Tx</span>
               </button>
               <button 
                 onClick={() => setShowSplitModal(true)}
                 className="glass-header rounded-xl py-4 flex flex-col items-center justify-center gap-2 hover:bg-surface-container transition-colors"
               >
-                <Users className="text-tertiary" size={20} />
+                <Users className="text-primary" size={20} />
                 <span className="font-label text-[10px] font-bold text-on-surface uppercase tracking-wider">Split Bill</span>
               </button>
               <button 
@@ -1262,14 +1577,19 @@ export default function App() {
           </motion.div>
         )}
 
-        {activeTab === 'savings' && (
+        {activeTab === 'upi' && (
           <motion.div 
             initial={{ opacity: 0, y: 10 }} 
             animate={{ opacity: 1, y: 0 }} 
             transition={SMOOTH_TRANSITION}
             className="pt-4"
           >
-            <SavingsView goals={savingsGoals} currency={profile.currency} />
+            <UPIManagement 
+              accounts={upiAccounts} 
+              onAdd={() => setShowAddUPIModal(true)} 
+              onDelete={(id) => setUpiAccounts(prev => prev.filter(a => a.id !== id))}
+              onSetDefault={(id) => setUpiAccounts(prev => prev.map(a => ({ ...a, isDefault: a.id === id })))}
+            />
           </motion.div>
         )}
 
@@ -1945,6 +2265,62 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+      
+      {/* UPI Modals */}
+      {showQRScanner && (
+        <QRScanner 
+          onScan={handleQRScan} 
+          onClose={() => setShowQRScanner(false)} 
+        />
+      )}
+
+      <BottomSheet 
+        isOpen={showUPIPaymentModal} 
+        onClose={() => {
+          setShowUPIPaymentModal(false);
+          setScannedUPI(null);
+        }}
+        title="UPI Payment"
+      >
+        {scannedUPI && (
+          <UPIPaymentModal 
+            upiData={scannedUPI} 
+            accounts={upiAccounts} 
+            onPay={handleUPIPay} 
+            onClose={() => setShowUPIPaymentModal(false)}
+            currency={profile.currency}
+          />
+        )}
+      </BottomSheet>
+
+      <BottomSheet 
+        isOpen={showAddUPIModal} 
+        onClose={() => setShowAddUPIModal(false)}
+        title="Link Bank Account"
+      >
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            {AVAILABLE_BANKS.map(bank => (
+              <button 
+                key={bank.id}
+                onClick={() => {
+                  const upiId = `${profile.name.toLowerCase().replace(/\s/g, '')}@${bank.id}`;
+                  addUPIAccount(bank, upiId);
+                }}
+                className="bg-surface-container p-4 rounded-2xl border border-white/5 flex flex-col items-center gap-3 hover:bg-surface-container-high transition-all active:scale-95"
+              >
+                <div className="w-12 h-12 bg-white rounded-xl p-2 flex items-center justify-center overflow-hidden">
+                  <img src={bank.logo} alt={bank.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                </div>
+                <span className="text-[10px] font-bold text-center leading-tight">{bank.name}</span>
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-on-surface-variant text-center px-4">
+            By linking your account, you agree to our Terms of Service and Privacy Policy. Obsidian Ledger uses secure encryption to protect your data.
+          </p>
+        </div>
+      </BottomSheet>
     </div>
   );
 }
