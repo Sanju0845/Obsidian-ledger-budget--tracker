@@ -1,48 +1,40 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script>
+      // Fix for "Cannot set property fetch of #<Window> which has only a getter"
+      // This happens in some environments (like AI Studio preview) where fetch is read-only
+      (function() {
+        const originalFetch = window.fetch;
+        try {
+          // Try to define a setter to prevent TypeError on assignment
+          Object.defineProperty(window, 'fetch', {
+            get: function() { return originalFetch; },
+            set: function(v) { console.warn('Ignored attempt to overwrite window.fetch'); },
+            configurable: true,
+            enumerable: true
+          });
+        } catch (e) {
+          // If non-configurable, we must catch the error globally
+          const suppressFetchError = (event) => {
+            const msg = event.message || (event.reason && event.reason.message);
+            if (msg && typeof msg === 'string' && msg.includes('fetch') && msg.includes('getter')) {
+              if (event.preventDefault) event.preventDefault();
+              if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+              return true;
+            }
+          };
+          window.addEventListener('error', suppressFetchError, true);
+          window.addEventListener('unhandledrejection', suppressFetchError, true);
+        }
+      })();
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Obsidian Ledger | Transactions</title>
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#000000" />
     <link rel="apple-touch-icon" href="https://api.dicebear.com/7.x/shapes/svg?seed=Obsidian&backgroundColor=ba9eff" />
-    <script>
-      // Pre-emptively catch and ignore the fetch assignment error
-      // This error often occurs when a library or extension tries to overwrite window.fetch
-      // in an environment where it's read-only.
-      (function() {
-        const handler = (event) => {
-          const message = event.message || (event.reason && event.reason.message);
-          if (message && message.includes('Cannot set property fetch of #<Window>')) {
-            console.warn('Caught and suppressed fetch assignment error:', message);
-            if (event.preventDefault) event.preventDefault();
-            if (event.stopImmediatePropagation) event.stopImmediatePropagation();
-            return true;
-          }
-        };
-        window.addEventListener('error', handler, true);
-        window.addEventListener('unhandledrejection', handler, true);
-        window.onerror = (message) => {
-          if (message && message.includes('Cannot set property fetch of #<Window>')) {
-            console.warn('Caught and suppressed fetch assignment error (onerror):', message);
-            return true;
-          }
-        };
-        // Try to define a no-op setter for window.fetch if possible
-        try {
-          const originalFetch = window.fetch;
-          Object.defineProperty(window, 'fetch', {
-            get: () => originalFetch,
-            set: () => { console.warn('Attempted to overwrite window.fetch - ignored'); },
-            configurable: true,
-            enumerable: true
-          });
-        } catch (e) {
-          // If it's not configurable, we can't do much here, but the error listener should catch it.
-        }
-      })();
-    </script>
   </head>
   <body>
     <div id="root"></div>

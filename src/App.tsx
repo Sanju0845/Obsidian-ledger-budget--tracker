@@ -3,6 +3,7 @@ import { motion, AnimatePresence, useAnimation, useDragControls } from 'motion/r
 import { 
   Search, 
   Plus, 
+  Minus,
   Home, 
   Wallet, 
   ReceiptText, 
@@ -903,7 +904,9 @@ const UPIPaymentModal = ({
   );
 };
 
-const UPIManagement = ({ accounts, onAdd, onDelete, onSetDefault }: { accounts: UPIAccount[], onAdd: () => void, onDelete: (id: string) => void, onSetDefault: (id: string) => void }) => {
+const UPIManagement = ({ accounts, transactions, onAdd, onDelete, onSetDefault, currency }: { accounts: UPIAccount[], transactions: Transaction[], onAdd: () => void, onDelete: (id: string) => void, onSetDefault: (id: string) => void, currency: string }) => {
+  const upiTransactions = transactions.filter(t => t.cardId === 'upi').slice(0, 5);
+
   return (
     <div className="space-y-8 pb-32">
       <div>
@@ -962,6 +965,114 @@ const UPIManagement = ({ accounts, onAdd, onDelete, onSetDefault }: { accounts: 
           <span className="font-bold">Link New Bank Account</span>
         </button>
       </div>
+
+      {upiTransactions.length > 0 && (
+        <div className="mt-10">
+          <h2 className="font-headline text-2xl font-bold mb-4">Recent UPI Payments</h2>
+          <div className="space-y-2">
+            {upiTransactions.map(tx => (
+              <TransactionItem key={tx.id} transaction={tx} currency={currency} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const SplitBillModal = ({ onClose }: { onClose: () => void }) => {
+  const [amount, setAmount] = useState('');
+  const [people, setPeople] = useState('2');
+  
+  return (
+    <div className="space-y-6">
+      <div>
+        <label className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-2 block">Total Amount</label>
+        <input 
+          type="number" 
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="0.00"
+          className="w-full bg-surface-container-low border border-white/5 rounded-2xl p-4 text-2xl font-bold focus:border-primary outline-none transition-colors"
+        />
+      </div>
+
+      <div>
+        <label className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-2 block">Number of People</label>
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => setPeople(Math.max(1, parseInt(people) - 1).toString())}
+            className="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center text-primary"
+          >
+            <Minus size={20} />
+          </button>
+          <span className="text-2xl font-bold flex-1 text-center">{people}</span>
+          <button 
+            onClick={() => setPeople((parseInt(people) + 1).toString())}
+            className="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center text-primary"
+          >
+            <Plus size={20} />
+          </button>
+        </div>
+      </div>
+
+      {amount && parseInt(people) > 0 && (
+        <div className="bg-primary/10 p-6 rounded-3xl border border-primary/20">
+          <p className="text-[10px] text-primary uppercase font-bold tracking-widest mb-1">Each Person Pays</p>
+          <p className="text-3xl font-bold text-primary">₹{(parseFloat(amount) / parseInt(people)).toFixed(2)}</p>
+        </div>
+      )}
+
+      <button 
+        onClick={() => {
+          alert(`Requesting ₹${(parseFloat(amount) / parseInt(people)).toFixed(2)} from ${parseInt(people) - 1} people`);
+          onClose();
+        }}
+        className="w-full py-4 bg-primary text-surface font-bold rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+      >
+        Send Split Request
+      </button>
+    </div>
+  );
+};
+
+const RequestMoneyModal = ({ onClose }: { onClose: () => void }) => {
+  const [amount, setAmount] = useState('');
+  const [upiId, setUpiId] = useState('');
+  
+  return (
+    <div className="space-y-6">
+      <div>
+        <label className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-2 block">Amount</label>
+        <input 
+          type="number" 
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="0.00"
+          className="w-full bg-surface-container-low border border-white/5 rounded-2xl p-4 text-2xl font-bold focus:border-primary outline-none transition-colors"
+        />
+      </div>
+
+      <div>
+        <label className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-2 block">Payer UPI ID</label>
+        <input 
+          type="text" 
+          value={upiId}
+          onChange={(e) => setUpiId(e.target.value)}
+          placeholder="example@upi"
+          className="w-full bg-surface-container-low border border-white/5 rounded-2xl p-4 font-bold focus:border-primary outline-none transition-colors"
+        />
+      </div>
+
+      <button 
+        onClick={() => {
+          alert(`Request for ₹${amount} sent to ${upiId}`);
+          onClose();
+        }}
+        className="w-full py-4 bg-primary text-surface font-bold rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+      >
+        Send Request
+      </button>
     </div>
   );
 };
@@ -997,6 +1108,8 @@ export default function App() {
   const [showSmsModal, setShowSmsModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showBudgetModal, setShowBudgetModal] = useState(false);
+  const [showSplitModal, setShowSplitModal] = useState(false);
+  const [showRequestModal, setShowRequestModal] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showUPIPaymentModal, setShowUPIPaymentModal] = useState(false);
   const [showAddUPIModal, setShowAddUPIModal] = useState(false);
@@ -1100,9 +1213,6 @@ export default function App() {
   const [appPin, setAppPin] = useState('1234'); // Default PIN
   const [showPinSettings, setShowPinSettings] = useState(false);
   const [newPin, setNewPin] = useState('');
-
-  const [showSplitModal, setShowSplitModal] = useState(false);
-  const [showRequestModal, setShowRequestModal] = useState(false);
 
   // UPI Handlers
   const handleQRScan = useCallback((data: string) => {
@@ -1535,6 +1645,60 @@ export default function App() {
               </button>
             </div>
 
+            <section className="mb-10">
+              <div className="flex justify-between items-end mb-4 px-2">
+                <h2 className="font-headline text-2xl font-bold">Savings Goals</h2>
+                <span className="text-primary text-sm font-bold cursor-pointer" onClick={() => setActiveTab('budget')}>View All</span>
+              </div>
+              <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+                {savingsGoals.map(goal => (
+                  <div key={goal.id} className="min-w-[240px] bg-surface-container-low p-6 rounded-[32px] border border-white/5 shadow-xl">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                        <Target size={20} />
+                      </div>
+                      <span className="text-[10px] font-bold text-primary uppercase tracking-widest">{Math.round((goal.current / goal.target) * 100)}%</span>
+                    </div>
+                    <h3 className="font-headline font-bold mb-1">{goal.name}</h3>
+                    <p className="text-xl font-bold mb-4">₹{goal.current.toLocaleString()} <span className="text-xs text-on-surface-variant font-normal">/ ₹{goal.target.toLocaleString()}</span></p>
+                    <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${(goal.current / goal.target) * 100}%` }}
+                        transition={SMOOTH_TRANSITION}
+                        className="h-full bg-primary"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="mb-10">
+              <div className="flex justify-between items-end mb-4 px-2">
+                <h2 className="font-headline text-2xl font-bold">Quick Transfer</h2>
+                <span className="text-primary text-sm font-bold cursor-pointer">View All</span>
+              </div>
+              <div className="flex gap-6 overflow-x-auto no-scrollbar pb-2">
+                {[1, 2, 3, 4, 5].map(i => (
+                  <div key={i} className="flex flex-col items-center gap-2 flex-shrink-0 cursor-pointer active:scale-90 transition-transform">
+                    <div className="w-16 h-16 rounded-full border-2 border-primary/20 p-1 bg-surface-container-low">
+                      <img 
+                        src={`https://api.dicebear.com/7.x/avataaars/svg?seed=Contact${i}`} 
+                        alt="Contact" 
+                        className="w-full h-full rounded-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                    <span className="text-[10px] font-bold text-on-surface-variant">Contact {i}</span>
+                  </div>
+                ))}
+                <button className="w-16 h-16 rounded-full border-2 border-dashed border-white/10 flex items-center justify-center text-on-surface-variant flex-shrink-0">
+                  <Plus size={24} />
+                </button>
+              </div>
+            </section>
+
             <section>
               <div className="flex justify-between items-end mb-4 px-2">
                 <h2 className="font-headline text-2xl font-bold">Ledger</h2>
@@ -1586,9 +1750,11 @@ export default function App() {
           >
             <UPIManagement 
               accounts={upiAccounts} 
+              transactions={transactions}
               onAdd={() => setShowAddUPIModal(true)} 
               onDelete={(id) => setUpiAccounts(prev => prev.filter(a => a.id !== id))}
               onSetDefault={(id) => setUpiAccounts(prev => prev.map(a => ({ ...a, isDefault: a.id === id })))}
+              currency={profile.currency}
             />
           </motion.div>
         )}
@@ -2138,33 +2304,7 @@ export default function App() {
         onClose={() => setShowSplitModal(false)}
         title="Split a Bill"
       >
-        <div className="space-y-6">
-          <div className="bg-surface-container p-6 rounded-2xl border border-white/5">
-            <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-2 block">Total Amount</label>
-            <div className="text-3xl font-headline font-bold text-primary">₹ 0.00</div>
-          </div>
-          
-          <div className="space-y-4">
-            <h4 className="text-[10px] uppercase font-bold text-on-surface-variant tracking-widest">Select Friends</h4>
-            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
-              {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} className="flex flex-col items-center gap-2 flex-shrink-0">
-                  <div className="w-14 h-14 rounded-full border-2 border-white/10 overflow-hidden bg-surface-container">
-                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=Friend${i}`} alt="Friend" />
-                  </div>
-                  <span className="text-[10px] font-medium">Friend {i}</span>
-                </div>
-              ))}
-              <button className="w-14 h-14 rounded-full border-2 border-dashed border-white/10 flex items-center justify-center text-on-surface-variant">
-                <Plus size={20} />
-              </button>
-            </div>
-          </div>
-
-          <button className="w-full bg-primary text-surface font-bold py-4 rounded-2xl shadow-lg active:scale-95 transition-transform">
-            Calculate Split
-          </button>
-        </div>
+        <SplitBillModal onClose={() => setShowSplitModal(false)} />
       </BottomSheet>
 
       <BottomSheet 
@@ -2172,27 +2312,7 @@ export default function App() {
         onClose={() => setShowRequestModal(false)}
         title="Request Money"
       >
-        <div className="space-y-6">
-          <div>
-            <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">Amount to Request</label>
-            <input 
-              type="number" 
-              placeholder="0.00" 
-              className="w-full bg-surface-container rounded-xl p-4 text-2xl font-headline font-bold focus:outline-none border border-white/5" 
-            />
-          </div>
-          <div>
-            <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">From (UPI ID or Phone)</label>
-            <input 
-              type="text" 
-              placeholder="username@upi or 9876543210" 
-              className="w-full bg-surface-container rounded-xl p-4 text-sm focus:outline-none border border-white/5" 
-            />
-          </div>
-          <button className="w-full bg-secondary text-white font-bold py-4 rounded-2xl shadow-lg active:scale-95 transition-transform">
-            Send Request
-          </button>
-        </div>
+        <RequestMoneyModal onClose={() => setShowRequestModal(false)} />
       </BottomSheet>
 
       {/* Add Card Modal */}
