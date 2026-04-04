@@ -43,6 +43,16 @@ export interface Notification {
   type: 'transaction' | 'budget' | 'system';
 }
 
+export interface SavingsGoal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  color: string;
+  icon: string;
+  deadline?: string;
+}
+
 export const BANK_LOGOS: Record<string, string> = {
   sbi: 'https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/logos/sbi.png',
   statebankofindia: 'https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/logos/sbi.png',

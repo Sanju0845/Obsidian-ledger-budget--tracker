@@ -45,7 +45,12 @@ import {
   Unlock,
   Eye,
   EyeOff,
-  MoreVertical
+  MoreVertical,
+  Target,
+  ArrowRightLeft,
+  Users,
+  HandCoins,
+  Search as SearchIcon
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -63,7 +68,7 @@ import {
   Legend
 } from 'recharts';
 import { cn } from './lib/utils';
-import { Transaction, Card, Budget, UserProfile, Notification, BANK_LOGOS, CARD_COLORS } from './types';
+import { Transaction, Card, Budget, UserProfile, Notification, BANK_LOGOS, CARD_COLORS, SavingsGoal } from './types';
 import { GoogleGenAI } from "@google/genai";
 
 // --- Constants & Mock Data ---
@@ -87,6 +92,11 @@ const INITIAL_PROFILE: UserProfile = {
   theme: 'dark'
 };
 
+const INITIAL_SAVINGS: SavingsGoal[] = [
+  { id: '1', name: 'New iPhone', targetAmount: 80000, currentAmount: 15000, color: '#ba9eff', icon: 'ShoppingBag' },
+  { id: '2', name: 'Europe Trip', targetAmount: 250000, currentAmount: 45000, color: '#699cff', icon: 'Plane' },
+];
+
 const CATEGORY_ICONS: Record<string, any> = {
   Dining: Utensils,
   Tech: ShoppingBag,
@@ -102,9 +112,9 @@ const CATEGORY_ICONS: Record<string, any> = {
   Study: GraduationCap,
 };
 
-// --- Spring Physics Constants ---
-const SPRING_CONFIG = { type: 'spring', stiffness: 400, damping: 30 };
-const SHEET_SPRING = { type: 'spring', stiffness: 300, damping: 30 };
+// --- Animation Constants ---
+const SMOOTH_TRANSITION = { type: 'tween' as const, ease: 'easeOut' as const, duration: 0.2 };
+const QUICK_TRANSITION = { type: 'tween' as const, ease: 'linear' as const, duration: 0.15 };
 
 // --- Bottom Sheet Component ---
 const BottomSheet = ({ 
@@ -128,6 +138,7 @@ const BottomSheet = ({
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
             exit={{ opacity: 0 }}
+            transition={QUICK_TRANSITION}
             className="absolute inset-0 bg-black/80 backdrop-blur-md"
             onClick={onClose}
           />
@@ -135,7 +146,7 @@ const BottomSheet = ({
             initial={{ y: '100%' }} 
             animate={{ y: 0 }} 
             exit={{ y: '100%' }}
-            transition={SHEET_SPRING}
+            transition={SMOOTH_TRANSITION}
             className="relative w-full max-w-md bg-surface-container-high rounded-t-[32px] p-6 pb-12 shadow-2xl border-t border-white/10 overflow-hidden"
             style={{ maxHeight: '90vh', height }}
           >
@@ -185,6 +196,7 @@ const AppLock = ({ onUnlock, savedPin }: { onUnlock: () => void, savedPin: strin
     <motion.div 
       initial={{ opacity: 0 }} 
       animate={{ opacity: 1 }} 
+      transition={SMOOTH_TRANSITION}
       className="fixed inset-0 z-[200] bg-surface flex flex-col items-center justify-center p-8"
     >
       <div className="mb-12 text-center">
@@ -200,6 +212,7 @@ const AppLock = ({ onUnlock, savedPin }: { onUnlock: () => void, savedPin: strin
           <motion.div 
             key={i}
             animate={error ? { x: [0, -10, 10, -10, 10, 0] } : {}}
+            transition={QUICK_TRANSITION}
             className={cn(
               "w-4 h-4 rounded-full border-2 transition-all duration-300",
               pin.length > i ? "bg-primary border-primary scale-125" : "border-white/20"
@@ -226,6 +239,73 @@ const AppLock = ({ onUnlock, savedPin }: { onUnlock: () => void, savedPin: strin
         ))}
       </div>
     </motion.div>
+  );
+};
+
+// --- Savings View Component ---
+const SavingsView = ({ goals, currency }: { goals: SavingsGoal[], currency: string }) => {
+  return (
+    <div className="space-y-8 pb-32">
+      <div>
+        <h1 className="font-headline text-4xl font-bold">Savings</h1>
+        <p className="text-on-surface-variant text-sm">Track your progress towards goals</p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4">
+        {goals.map(goal => {
+          const percent = Math.min((goal.currentAmount / goal.targetAmount) * 100, 100);
+          return (
+            <div key={goal.id} className="bg-surface-container-low p-6 rounded-[32px] border border-white/5 shadow-xl relative overflow-hidden">
+              <div className="flex justify-between items-start mb-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${goal.color}20`, color: goal.color }}>
+                    {goal.icon === 'ShoppingBag' ? <ShoppingBag size={24} /> : <Plane size={24} />}
+                  </div>
+                  <div>
+                    <h3 className="font-headline font-bold text-lg">{goal.name}</h3>
+                    <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest">
+                      {formatCurrency(goal.currentAmount, currency)} of {formatCurrency(goal.targetAmount, currency)}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-primary font-bold text-lg">{percent.toFixed(0)}%</span>
+              </div>
+
+              <div className="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden mb-4">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${percent}%` }}
+                  transition={SMOOTH_TRANSITION}
+                  className="h-full bg-primary"
+                  style={{ backgroundColor: goal.color }}
+                />
+              </div>
+
+              <div className="flex justify-between items-center">
+                <div className="flex -space-x-2">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="w-6 h-6 rounded-full border-2 border-surface bg-surface-container-high overflow-hidden">
+                      <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${goal.id}${i}`} alt="Contributor" />
+                    </div>
+                  ))}
+                  <div className="w-6 h-6 rounded-full border-2 border-surface bg-primary/20 flex items-center justify-center text-[8px] font-bold text-primary">
+                    +12
+                  </div>
+                </div>
+                <button className="bg-white/5 hover:bg-white/10 px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-colors">
+                  Add Funds
+                </button>
+              </div>
+            </div>
+          );
+        })}
+
+        <button className="w-full h-32 rounded-[32px] border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-2 text-on-surface-variant hover:text-white hover:border-white/20 transition-all">
+          <Plus size={24} />
+          <span className="font-bold">Create New Goal</span>
+        </button>
+      </div>
+    </div>
   );
 };
 
@@ -379,7 +459,7 @@ const AnalyticsView = ({ transactions, profile, budgets }: { transactions: Trans
                     <motion.div 
                       initial={{ width: 0 }}
                       animate={{ width: `${percent}%` }}
-                      transition={SPRING_CONFIG}
+                      transition={SMOOTH_TRANSITION}
                       className={cn("h-full", percent > 90 ? "bg-error" : "bg-primary")}
                     />
                   </div>
@@ -405,13 +485,13 @@ const SwipeableItem = ({ children, onDelete, onEdit, className }: { children: Re
 
   const handleDragEnd = (_: any, info: any) => {
     if (info.offset.x < -50) {
-      if (isMounted.current) controls.start({ x: -80 });
+      if (isMounted.current) controls.start({ x: -80, transition: SMOOTH_TRANSITION });
       setIsOpen('delete');
     } else if (info.offset.x > 50) {
-      if (isMounted.current) controls.start({ x: 80 });
+      if (isMounted.current) controls.start({ x: 80, transition: SMOOTH_TRANSITION });
       setIsOpen('edit');
     } else {
-      if (isMounted.current) controls.start({ x: 0 });
+      if (isMounted.current) controls.start({ x: 0, transition: SMOOTH_TRANSITION });
       setIsOpen(null);
     }
   };
@@ -529,8 +609,8 @@ const CardStack = React.memo(({ cards, activeIndex, onSwipe, currency }: { cards
                   zIndex: cards.length - relIdx,
                   rotate: relIdx * 2
                 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-                exit={{ x: -300, opacity: 0, rotate: -20, transition: { duration: 0.3 } }}
+                transition={SMOOTH_TRANSITION}
+                exit={{ x: -300, opacity: 0, rotate: -20, transition: { duration: 0.2 } }}
                 drag={relIdx === 0 ? "x" : false}
                 dragConstraints={{ left: 0, right: 0 }}
                 onDragEnd={(_, info) => {
@@ -631,8 +711,8 @@ const BottomNavBar = ({ activeTab, onTabChange }: { activeTab: string, onTabChan
   const tabs = [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'budget', label: 'Budget', icon: Wallet },
+    { id: 'savings', label: 'Savings', icon: Target },
     { id: 'transactions', label: 'Ledger', icon: ReceiptText },
-    { id: 'categories', label: 'Categories', icon: LayoutGrid },
     { id: 'profile', label: 'Settings', icon: Settings },
   ];
 
@@ -653,10 +733,10 @@ const BottomNavBar = ({ activeTab, onTabChange }: { activeTab: string, onTabChan
               )}
             >
               <motion.div
-                animate={activeTab === tab.id ? { scale: 1.2, y: -2 } : { scale: 1, y: 0 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 10 }}
+                animate={activeTab === tab.id ? { scale: 1.1, y: -1 } : { scale: 1, y: 0 }}
+                transition={QUICK_TRANSITION}
               >
-                <tab.icon size={22} className={cn("mb-1", activeTab === tab.id && "fill-primary/20")} />
+                <tab.icon size={18} className={cn("mb-1", activeTab === tab.id && "fill-primary/20")} />
               </motion.div>
               <span className="text-[10px] font-medium tracking-tight">{tab.label}</span>
               {activeTab === tab.id && (
@@ -687,6 +767,10 @@ export default function App() {
   const [budgets, setBudgets] = useState<Budget[]>(() => {
     const saved = localStorage.getItem('obsidian_budgets');
     return saved ? JSON.parse(saved) : INITIAL_BUDGETS;
+  });
+  const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>(() => {
+    const saved = localStorage.getItem('obsidian_savings');
+    return saved ? JSON.parse(saved) : INITIAL_SAVINGS;
   });
 
   const [activeCardIndex, setActiveCardIndex] = useState(0);
@@ -740,6 +824,10 @@ export default function App() {
   }, [budgets]);
 
   useEffect(() => {
+    localStorage.setItem('obsidian_savings', JSON.stringify(savingsGoals));
+  }, [savingsGoals]);
+
+  useEffect(() => {
     localStorage.setItem('obsidian_profile', JSON.stringify(profile));
   }, [profile]);
 
@@ -787,6 +875,12 @@ export default function App() {
   const [appPin, setAppPin] = useState('1234'); // Default PIN
   const [showPinSettings, setShowPinSettings] = useState(false);
   const [newPin, setNewPin] = useState('');
+
+  const [showSplitModal, setShowSplitModal] = useState(false);
+  const [showRequestModal, setShowRequestModal] = useState(false);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
 
   const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1061,7 +1155,11 @@ export default function App() {
 
       <main className="pt-24 px-4 max-w-2xl mx-auto">
         {activeTab === 'home' && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }}
+            transition={SMOOTH_TRANSITION}
+          >
             <section className="mb-10 px-2">
               <span className="text-on-surface-variant font-label text-sm uppercase tracking-widest">Total Liquidity</span>
               <h1 className="font-headline text-6xl mt-2 tracking-tighter">
@@ -1091,7 +1189,7 @@ export default function App() {
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-2 mb-10">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-10">
               <button 
                 onClick={() => setShowSmsModal(true)}
                 className="glass-header rounded-xl py-4 flex flex-col items-center justify-center gap-2 hover:bg-surface-container transition-colors"
@@ -1107,11 +1205,18 @@ export default function App() {
                 <span className="font-label text-[10px] font-bold text-on-surface uppercase tracking-wider">Add Tx</span>
               </button>
               <button 
-                onClick={() => setShowAddCardModal(true)}
+                onClick={() => setShowSplitModal(true)}
                 className="glass-header rounded-xl py-4 flex flex-col items-center justify-center gap-2 hover:bg-surface-container transition-colors"
               >
-                <CreditCard className="text-tertiary" size={20} />
-                <span className="font-label text-[10px] font-bold text-on-surface uppercase tracking-wider">Cards</span>
+                <Users className="text-tertiary" size={20} />
+                <span className="font-label text-[10px] font-bold text-on-surface uppercase tracking-wider">Split Bill</span>
+              </button>
+              <button 
+                onClick={() => setShowRequestModal(true)}
+                className="glass-header rounded-xl py-4 flex flex-col items-center justify-center gap-2 hover:bg-surface-container transition-colors"
+              >
+                <HandCoins className="text-error" size={20} />
+                <span className="font-label text-[10px] font-bold text-on-surface uppercase tracking-wider">Request</span>
               </button>
             </div>
 
@@ -1148,17 +1253,33 @@ export default function App() {
 
         {activeTab === 'budget' && (
           <motion.div 
-            initial={{ opacity: 0, y: 20 }} 
+            initial={{ opacity: 0, y: 10 }} 
             animate={{ opacity: 1, y: 0 }} 
-            transition={SPRING_CONFIG}
+            transition={SMOOTH_TRANSITION}
             className="pt-4"
           >
             <AnalyticsView transactions={transactions} profile={profile} budgets={budgets} />
           </motion.div>
         )}
 
+        {activeTab === 'savings' && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            transition={SMOOTH_TRANSITION}
+            className="pt-4"
+          >
+            <SavingsView goals={savingsGoals} currency={profile.currency} />
+          </motion.div>
+        )}
+
         {activeTab === 'categories' && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pt-4">
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            transition={SMOOTH_TRANSITION}
+            className="pt-4"
+          >
             <div className="flex items-center gap-4 mb-8">
               {selectedCategory && (
                 <button onClick={() => setSelectedCategory(null)} className="text-primary">
@@ -1229,9 +1350,9 @@ export default function App() {
 
         {activeTab === 'profile' && (
           <motion.div 
-            initial={{ opacity: 0, y: 20 }} 
+            initial={{ opacity: 0, y: 10 }} 
             animate={{ opacity: 1, y: 0 }} 
-            transition={SPRING_CONFIG}
+            transition={SMOOTH_TRANSITION}
             className="pt-4"
           >
             <h1 className="font-headline text-4xl font-bold mb-8">Settings</h1>
@@ -1322,6 +1443,7 @@ export default function App() {
                   >
                     <motion.div 
                       animate={{ x: smsSyncEnabled ? 24 : 4 }}
+                      transition={QUICK_TRANSITION}
                       className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-md"
                     />
                   </button>
@@ -1361,9 +1483,9 @@ export default function App() {
 
         {activeTab === 'transactions' && (
           <motion.div 
-            initial={{ opacity: 0, y: 20 }} 
+            initial={{ opacity: 0, y: 10 }} 
             animate={{ opacity: 1, y: 0 }} 
-            transition={SPRING_CONFIG}
+            transition={SMOOTH_TRANSITION}
             className="pt-4"
           >
             <div className="flex justify-between items-center mb-8">
@@ -1386,21 +1508,63 @@ export default function App() {
                 </button>
               </div>
             </div>
+
+            <div className="space-y-4 mb-8">
+              <div className="relative">
+                <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant" size={18} />
+                <input 
+                  type="text" 
+                  placeholder="Search transactions..." 
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full bg-surface-container rounded-2xl py-4 pl-12 pr-4 text-sm focus:outline-none border border-white/5"
+                />
+              </div>
+              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+                {['all', 'income', 'expense'].map(type => (
+                  <button 
+                    key={type}
+                    onClick={() => setFilterType(type as any)}
+                    className={cn(
+                      "px-6 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap",
+                      filterType === type ? "bg-primary text-surface" : "bg-surface-container text-on-surface-variant border border-white/5"
+                    )}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="space-y-6">
               <div className="space-y-1">
                 <h3 className="text-[10px] font-headline font-bold text-outline uppercase tracking-[0.2em] px-2 mb-2">History</h3>
                 <div className="space-y-1">
-                  {transactions.length > 0 ? (
-                    transactions.map(tx => (
-                      <TransactionItem 
-                        key={tx.id} 
-                        transaction={tx} 
-                        onDelete={handleDeleteTransaction}
-                        currency={profile.currency}
-                      />
-                    ))
+                  {transactions
+                    .filter(t => {
+                      const matchesSearch = t.merchant.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                          t.category.toLowerCase().includes(searchQuery.toLowerCase());
+                      const matchesType = filterType === 'all' || t.type === filterType;
+                      return matchesSearch && matchesType;
+                    })
+                    .length > 0 ? (
+                    transactions
+                      .filter(t => {
+                        const matchesSearch = t.merchant.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                            t.category.toLowerCase().includes(searchQuery.toLowerCase());
+                        const matchesType = filterType === 'all' || t.type === filterType;
+                        return matchesSearch && matchesType;
+                      })
+                      .map(tx => (
+                        <TransactionItem 
+                          key={tx.id} 
+                          transaction={tx} 
+                          onDelete={handleDeleteTransaction}
+                          currency={profile.currency}
+                        />
+                      ))
                   ) : (
-                    <div className="text-center py-20 text-on-surface-variant">No history yet</div>
+                    <div className="text-center py-20 text-on-surface-variant">No transactions found</div>
                   )}
                 </div>
               </div>
@@ -1649,17 +1813,81 @@ export default function App() {
         </div>
       </BottomSheet>
 
+      <BottomSheet 
+        isOpen={showSplitModal} 
+        onClose={() => setShowSplitModal(false)}
+        title="Split a Bill"
+      >
+        <div className="space-y-6">
+          <div className="bg-surface-container p-6 rounded-2xl border border-white/5">
+            <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-2 block">Total Amount</label>
+            <div className="text-3xl font-headline font-bold text-primary">₹ 0.00</div>
+          </div>
+          
+          <div className="space-y-4">
+            <h4 className="text-[10px] uppercase font-bold text-on-surface-variant tracking-widest">Select Friends</h4>
+            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="flex flex-col items-center gap-2 flex-shrink-0">
+                  <div className="w-14 h-14 rounded-full border-2 border-white/10 overflow-hidden bg-surface-container">
+                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=Friend${i}`} alt="Friend" />
+                  </div>
+                  <span className="text-[10px] font-medium">Friend {i}</span>
+                </div>
+              ))}
+              <button className="w-14 h-14 rounded-full border-2 border-dashed border-white/10 flex items-center justify-center text-on-surface-variant">
+                <Plus size={20} />
+              </button>
+            </div>
+          </div>
+
+          <button className="w-full bg-primary text-surface font-bold py-4 rounded-2xl shadow-lg active:scale-95 transition-transform">
+            Calculate Split
+          </button>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet 
+        isOpen={showRequestModal} 
+        onClose={() => setShowRequestModal(false)}
+        title="Request Money"
+      >
+        <div className="space-y-6">
+          <div>
+            <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">Amount to Request</label>
+            <input 
+              type="number" 
+              placeholder="0.00" 
+              className="w-full bg-surface-container rounded-xl p-4 text-2xl font-headline font-bold focus:outline-none border border-white/5" 
+            />
+          </div>
+          <div>
+            <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">From (UPI ID or Phone)</label>
+            <input 
+              type="text" 
+              placeholder="username@upi or 9876543210" 
+              className="w-full bg-surface-container rounded-xl p-4 text-sm focus:outline-none border border-white/5" 
+            />
+          </div>
+          <button className="w-full bg-secondary text-white font-bold py-4 rounded-2xl shadow-lg active:scale-95 transition-transform">
+            Send Request
+          </button>
+        </div>
+      </BottomSheet>
+
       {/* Add Card Modal */}
       <AnimatePresence>
         {showAddCardModal && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={QUICK_TRANSITION}
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
               onClick={() => setShowAddCardModal(false)}
             />
             <motion.div 
               initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={SMOOTH_TRANSITION}
               className="relative w-full max-w-md bg-surface-container-high rounded-t-3xl p-8 pb-12 shadow-2xl border-t border-white/10"
             >
               <div className="flex justify-between items-center mb-6">
