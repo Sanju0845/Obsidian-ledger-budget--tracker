@@ -62,3 +62,30 @@
   scrollbar-width: none;
 }
 
+/* Hide html5-qrcode default UI elements */
+#reader__scan_region {
+  border: none !important;
+}
+
+#reader__dashboard, 
+#reader__status_span, 
+#reader__header_tag, 
+#reader video {
+  border: none !important;
+}
+
+#reader__dashboard button {
+  display: none !important;
+}
+
+#reader img {
+  display: none !important;
+}
+
+/* Ensure the video fills the container */
+#reader video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+

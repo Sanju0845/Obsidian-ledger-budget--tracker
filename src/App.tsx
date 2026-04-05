@@ -34,6 +34,7 @@ import {
   Trash2,
   Edit2,
   Check,
+  RefreshCw,
   TrendingUp,
   TrendingDown,
   PieChart as PieChartIcon,
@@ -575,7 +576,7 @@ const TopAppBar = ({ profile, onProfileClick, onNotificationsClick, unreadCount 
           referrerPolicy="no-referrer"
         />
       </div>
-      <span className="ml-3 mr-4 font-headline font-bold text-white text-sm tracking-tight">{profile.name} v1.5.</span>
+      <span className="ml-3 mr-4 font-headline font-bold text-white text-sm tracking-tight">{profile.name} v1.6.</span>
     </div>
     <div className="flex gap-2">
       <button 
@@ -769,113 +770,163 @@ const BottomNavBar = ({ activeTab, onTabChange }: { activeTab: string, onTabChan
 const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClose: () => void }) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
 
-  useEffect(() => {
-    const html5QrCode = new Html5Qrcode("reader");
+  const startScanner = async (mode: "user" | "environment") => {
+    if (scannerRef.current?.isScanning) {
+      await scannerRef.current.stop();
+    }
+    
+    const html5QrCode = scannerRef.current || new Html5Qrcode("reader");
     scannerRef.current = html5QrCode;
 
-    const startScanner = async () => {
-      try {
-        const devices = await Html5Qrcode.getCameras();
-        const backCamera = devices.find(device => 
-          device.label.toLowerCase().includes('back') || 
-          device.label.toLowerCase().includes('rear') ||
-          device.label.toLowerCase().includes('environment')
-        );
-
-        const config = { fps: 10, qrbox: { width: 280, height: 280 } };
-        
-        if (backCamera) {
-          await html5QrCode.start(
-            backCamera.id,
-            config,
-            (decodedText) => {
-              onScan(decodedText);
-              html5QrCode.stop().catch(console.error);
-            },
-            () => {}
-          );
-        } else {
-          // Fallback to environment facing mode if no explicit back camera found
-          await html5QrCode.start(
-            { facingMode: "environment" },
-            config,
-            (decodedText) => {
-              onScan(decodedText);
-              html5QrCode.stop().catch(console.error);
-            },
-            () => {}
-          );
+    try {
+      const config = { 
+        fps: 25, 
+        aspectRatio: 1.0,
+        qrbox: (viewWidth: number, viewHeight: number) => {
+          return { width: viewWidth, height: viewHeight };
         }
-        setIsReady(true);
-      } catch (err) {
-        console.error("Error starting scanner:", err);
-        // Final fallback to any camera
-        try {
-          await html5QrCode.start(
-            { facingMode: "user" },
-            { fps: 10, qrbox: { width: 250, height: 250 } },
-            (decodedText) => {
-              onScan(decodedText);
-              html5QrCode.stop().catch(console.error);
-            },
-            () => {}
-          );
-          setIsReady(true);
-        } catch (err2) {
-          console.error("Fallback scanner error:", err2);
-        }
+      };
+      
+      await html5QrCode.start(
+        { facingMode: mode },
+        config,
+        (decodedText) => {
+          onScan(decodedText);
+          html5QrCode.stop().catch(console.error);
+        },
+        () => {}
+      );
+      setIsReady(true);
+    } catch (err) {
+      console.error("Error starting scanner:", err);
+      // If environment fails, try user
+      if (mode === "environment") {
+        setFacingMode("user");
+        startScanner("user");
       }
-    };
+    }
+  };
 
-    startScanner();
-
+  useEffect(() => {
+    startScanner(facingMode);
     return () => {
       if (scannerRef.current?.isScanning) {
         scannerRef.current.stop().catch(console.error);
       }
     };
-  }, [onScan]);
+  }, []);
+
+  const toggleCamera = () => {
+    const newMode = facingMode === "environment" ? "user" : "environment";
+    setFacingMode(newMode);
+    startScanner(newMode);
+  };
 
   return (
-    <div className="fixed inset-0 z-[150] bg-black flex flex-col items-center justify-center p-6">
-      <div className="w-full flex justify-between items-center mb-8">
-        <h2 className="text-white font-headline text-2xl font-bold">Scan QR Code</h2>
-        <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white">
-          <X size={20} />
-        </button>
-      </div>
-      <div className="relative w-full max-w-sm aspect-square rounded-3xl overflow-hidden border-2 border-primary/50 bg-surface-container shadow-[0_0_50px_rgba(186,158,255,0.2)]">
-        {!isReady && (
-          <div className="absolute inset-0 flex items-center justify-center z-20 bg-surface/80">
-            <motion.div 
-              animate={{ rotate: 360 }} 
-              transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-              className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
-            />
+    <div className="fixed inset-0 z-[150] bg-black flex flex-col items-center justify-center overflow-hidden">
+      {/* Top Bar */}
+      <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-50 bg-gradient-to-b from-black/90 to-transparent">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+            <Zap size={20} className="text-primary" />
           </div>
-        )}
-        <div id="reader" className="w-full h-full" />
-        
-        {/* Scanning Animation Overlay */}
-        <div className="absolute inset-0 pointer-events-none border-[40px] border-black/40 z-10">
-          <div className="w-full h-full border-2 border-primary/50 relative">
-            {/* Corner Accents */}
-            <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-primary rounded-tl-lg" />
-            <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-primary rounded-tr-lg" />
-            <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-primary rounded-bl-lg" />
-            <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-primary rounded-br-lg" />
-            
-            {/* Scanning Line */}
-            <motion.div 
-              animate={{ top: ['0%', '100%', '0%'] }}
-              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-              className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent shadow-[0_0_15px_rgba(186,158,255,0.8)]"
-            />
+          <div>
+            <h2 className="text-white font-headline text-lg font-bold">Scan & Pay</h2>
+            <p className="text-white/40 text-[10px] uppercase tracking-widest font-bold">UPI Secure</p>
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={toggleCamera}
+            className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-xl flex items-center justify-center text-white active:scale-90 transition-all border border-white/10"
+          >
+            <RefreshCw size={20} />
+          </button>
+          <button 
+            onClick={onClose} 
+            className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-xl flex items-center justify-center text-white active:scale-90 transition-all border border-white/10"
+          >
+            <X size={24} />
+          </button>
+        </div>
       </div>
-      <p className="text-white/60 text-center mt-8 text-sm">Align the QR code within the frame to scan</p>
+
+      {/* Scanner Viewport */}
+      <div className="relative w-full h-full bg-black flex items-center justify-center">
+        <div id="reader" className="w-full h-full" />
+        
+        {/* Custom Pro Overlay */}
+        <div className="absolute inset-0 z-40 pointer-events-none">
+          {/* Darkened Mask */}
+          <div className="absolute inset-0 bg-black/60" style={{ 
+            clipPath: 'polygon(0% 0%, 0% 100%, 100% 100%, 100% 0%, 0% 0%, calc(50% - 140px) calc(50% - 140px), calc(50% + 140px) calc(50% - 140px), calc(50% + 140px) calc(50% + 140px), calc(50% - 140px) calc(50% + 140px), calc(50% - 140px) calc(50% - 140px))' 
+          }} />
+
+          {/* Scan Frame Container */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-[280px] h-[280px] relative">
+              {/* Animated Corners */}
+              <motion.div 
+                animate={{ scale: [1, 1.05, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="absolute inset-0"
+              >
+                <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-primary rounded-tl-3xl" />
+                <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-primary rounded-tr-3xl" />
+                <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-primary rounded-bl-3xl" />
+                <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-primary rounded-br-3xl" />
+              </motion.div>
+
+              {/* Scanning Laser */}
+              <motion.div 
+                animate={{ 
+                  top: ['5%', '95%', '5%'],
+                  opacity: [0.4, 1, 0.4]
+                }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute left-4 right-4 h-1 bg-primary shadow-[0_0_25px_rgba(186,158,255,1)] z-50 rounded-full"
+              />
+
+              {/* Center Target */}
+              <div className="absolute inset-0 flex items-center justify-center opacity-20">
+                <div className="w-1 h-8 bg-white rounded-full" />
+                <div className="w-8 h-1 bg-white rounded-full absolute" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {!isReady && (
+          <div className="absolute inset-0 flex items-center justify-center z-50 bg-black">
+            <div className="flex flex-col items-center gap-6">
+              <div className="relative">
+                <motion.div 
+                  animate={{ rotate: 360 }} 
+                  transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+                  className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full"
+                />
+                <Zap size={24} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary animate-pulse" />
+              </div>
+              <div className="text-center">
+                <p className="text-white font-headline text-lg font-bold">Waking up Camera</p>
+                <p className="text-white/40 text-xs mt-1">Securing your connection...</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom Instructions */}
+      <div className="absolute bottom-0 left-0 right-0 p-12 text-center z-50 bg-gradient-to-t from-black/90 to-transparent">
+        <div className="bg-white/10 backdrop-blur-xl border border-white/10 rounded-2xl py-3 px-6 inline-block">
+          <p className="text-white/90 text-sm font-medium flex items-center gap-2">
+            <Sparkles size={16} className="text-primary" />
+            Align QR code to pay instantly
+          </p>
+        </div>
+      </div>
     </div>
   );
 };
@@ -893,12 +944,14 @@ const UPIPaymentModal = ({
   accounts, 
   onContinue,
   onClose,
+  onAddAccount,
   currency 
 }: { 
   upiData: { upiId: string, name?: string, amount?: string }, 
   accounts: UPIAccount[], 
   onContinue: (amount: string, accountId: string) => void,
   onClose: () => void,
+  onAddAccount: () => void,
   currency: string
 }) => {
   const [amount, setAmount] = useState(upiData.amount || '');
@@ -906,7 +959,11 @@ const UPIPaymentModal = ({
   const [isPaying, setIsPaying] = useState(false);
 
   const handlePay = () => {
-    if (!amount || !selectedAccountId) return;
+    if (!amount) return;
+    if (!selectedAccountId) {
+      onAddAccount();
+      return;
+    }
     onContinue(amount, selectedAccountId);
   };
 
@@ -939,34 +996,57 @@ const UPIPaymentModal = ({
       <div className="space-y-2">
         <label className="text-[10px] uppercase font-bold text-on-surface-variant tracking-widest ml-1">Pay From</label>
         <div className="space-y-2">
-          {accounts.map(acc => (
-            <button 
-              key={acc.id}
-              onClick={() => setSelectedAccountId(acc.id)}
-              className={cn(
-                "w-full p-4 rounded-2xl border flex items-center justify-between transition-all",
-                selectedAccountId === acc.id ? "bg-primary/10 border-primary" : "bg-surface-container border-transparent"
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-                  <Wallet size={20} className="text-primary" />
+          {accounts.length === 0 ? (
+            <div className="p-1 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-2xl">
+              <button 
+                onClick={onAddAccount}
+                className="w-full p-6 rounded-xl bg-surface-container border border-white/5 flex flex-col items-center justify-center gap-2 text-primary hover:bg-surface-container-high transition-all active:scale-95"
+              >
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Plus size={24} />
                 </div>
-                <div className="text-left">
-                  <p className="font-bold text-sm">{acc.bankName}</p>
-                  <p className="text-[10px] text-on-surface-variant">{acc.upiId}</p>
+                <span className="font-bold text-sm">Link Bank Account</span>
+                <span className="text-[10px] text-on-surface-variant font-normal">Required to complete payment</span>
+              </button>
+            </div>
+          ) : (
+            accounts.map(acc => (
+              <button 
+                key={acc.id}
+                onClick={() => setSelectedAccountId(acc.id)}
+                className={cn(
+                  "w-full p-4 rounded-2xl border flex items-center justify-between transition-all",
+                  selectedAccountId === acc.id ? "bg-primary/10 border-primary shadow-[0_0_20px_rgba(186,158,255,0.1)]" : "bg-surface-container border-transparent"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+                    <Wallet size={20} className="text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-bold text-sm">{acc.bankName}</p>
+                    <p className="text-[10px] text-on-surface-variant">{acc.upiId}</p>
+                  </div>
                 </div>
-              </div>
-              {selectedAccountId === acc.id && <Check size={20} className="text-primary" />}
-            </button>
-          ))}
+                <div className={cn(
+                  "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
+                  selectedAccountId === acc.id ? "bg-primary border-primary" : "border-white/10"
+                )}>
+                  {selectedAccountId === acc.id && <Check size={14} className="text-surface font-bold" />}
+                </div>
+              </button>
+            ))
+          )}
         </div>
       </div>
 
       <button 
         disabled={!amount || isPaying}
         onClick={handlePay}
-        className="w-full h-14 bg-primary text-surface rounded-2xl font-bold text-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale transition-all active:scale-95"
+        className={cn(
+          "w-full h-16 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition-all active:scale-95",
+          !amount || isPaying ? "bg-white/5 text-white/20 grayscale" : "bg-primary text-surface shadow-[0_8px_32px_rgba(186,158,255,0.3)]"
+        )}
       >
         {isPaying ? (
           <motion.div 
@@ -977,7 +1057,7 @@ const UPIPaymentModal = ({
         ) : (
           <>
             <Zap size={20} />
-            Continue to Payment
+            {accounts.length === 0 ? "Link Account to Pay" : "Continue to Payment"}
           </>
         )}
       </button>
@@ -1200,7 +1280,10 @@ export default function App() {
   const handleUPIContinue = (amount: string, accountId: string) => {
     setPaymentAmount(amount);
     setSelectedUPIAccount(accountId);
-    setShowUPIAppChooser(true);
+    setShowUPIPaymentModal(false); // Close the payment modal first
+    setTimeout(() => {
+      setShowUPIAppChooser(true);
+    }, 300);
   };
 
   const executeUPIPayment = (appPackage?: string) => {
@@ -2517,6 +2600,10 @@ export default function App() {
             accounts={upiAccounts} 
             onContinue={handleUPIContinue} 
             onClose={() => setShowUPIPaymentModal(false)}
+            onAddAccount={() => {
+              setShowUPIPaymentModal(false);
+              setShowAddUPIModal(true);
+            }}
             currency={profile.currency}
           />
         )}
