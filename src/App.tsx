@@ -776,24 +776,35 @@ const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClos
 
     const startScanner = async () => {
       try {
-        const devices = await Html5Qrcode.getCameras();
-        if (devices && devices.length > 0) {
-          const cameraId = devices[0].id; // Use the first camera
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 280, height: 280 } },
+          (decodedText) => {
+            onScan(decodedText);
+            html5QrCode.stop().catch(console.error);
+          },
+          (errorMessage) => {
+            // console.warn(errorMessage);
+          }
+        );
+        setIsReady(true);
+      } catch (err) {
+        console.error("Error starting scanner:", err);
+        // Fallback to any camera if environment fails
+        try {
           await html5QrCode.start(
-            cameraId,
+            { facingMode: "user" },
             { fps: 10, qrbox: { width: 250, height: 250 } },
             (decodedText) => {
               onScan(decodedText);
               html5QrCode.stop().catch(console.error);
             },
-            (errorMessage) => {
-              // console.warn(errorMessage);
-            }
+            () => {}
           );
           setIsReady(true);
+        } catch (err2) {
+          console.error("Fallback scanner error:", err2);
         }
-      } catch (err) {
-        console.error("Error starting scanner:", err);
       }
     };
 
