@@ -575,7 +575,7 @@ const TopAppBar = ({ profile, onProfileClick, onNotificationsClick, unreadCount 
           referrerPolicy="no-referrer"
         />
       </div>
-      <span className="ml-3 mr-4 font-headline font-bold text-white text-sm tracking-tight">{profile.name}.</span>
+      <span className="ml-3 mr-4 font-headline font-bold text-white text-sm tracking-tight">{profile.name} v1.5.</span>
     </div>
     <div className="flex gap-2">
       <button 
@@ -776,21 +776,41 @@ const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClos
 
     const startScanner = async () => {
       try {
-        await html5QrCode.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 280, height: 280 } },
-          (decodedText) => {
-            onScan(decodedText);
-            html5QrCode.stop().catch(console.error);
-          },
-          (errorMessage) => {
-            // console.warn(errorMessage);
-          }
+        const devices = await Html5Qrcode.getCameras();
+        const backCamera = devices.find(device => 
+          device.label.toLowerCase().includes('back') || 
+          device.label.toLowerCase().includes('rear') ||
+          device.label.toLowerCase().includes('environment')
         );
+
+        const config = { fps: 10, qrbox: { width: 280, height: 280 } };
+        
+        if (backCamera) {
+          await html5QrCode.start(
+            backCamera.id,
+            config,
+            (decodedText) => {
+              onScan(decodedText);
+              html5QrCode.stop().catch(console.error);
+            },
+            () => {}
+          );
+        } else {
+          // Fallback to environment facing mode if no explicit back camera found
+          await html5QrCode.start(
+            { facingMode: "environment" },
+            config,
+            (decodedText) => {
+              onScan(decodedText);
+              html5QrCode.stop().catch(console.error);
+            },
+            () => {}
+          );
+        }
         setIsReady(true);
       } catch (err) {
         console.error("Error starting scanner:", err);
-        // Fallback to any camera if environment fails
+        // Final fallback to any camera
         try {
           await html5QrCode.start(
             { facingMode: "user" },
@@ -825,9 +845,9 @@ const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClos
           <X size={20} />
         </button>
       </div>
-      <div className="relative w-full max-w-sm aspect-square rounded-3xl overflow-hidden border-2 border-primary/50 bg-surface-container">
+      <div className="relative w-full max-w-sm aspect-square rounded-3xl overflow-hidden border-2 border-primary/50 bg-surface-container shadow-[0_0_50px_rgba(186,158,255,0.2)]">
         {!isReady && (
-          <div className="absolute inset-0 flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center justify-center z-20 bg-surface/80">
             <motion.div 
               animate={{ rotate: 360 }} 
               transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
@@ -836,6 +856,24 @@ const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClos
           </div>
         )}
         <div id="reader" className="w-full h-full" />
+        
+        {/* Scanning Animation Overlay */}
+        <div className="absolute inset-0 pointer-events-none border-[40px] border-black/40 z-10">
+          <div className="w-full h-full border-2 border-primary/50 relative">
+            {/* Corner Accents */}
+            <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-primary rounded-tl-lg" />
+            <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-primary rounded-tr-lg" />
+            <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-primary rounded-bl-lg" />
+            <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-primary rounded-br-lg" />
+            
+            {/* Scanning Line */}
+            <motion.div 
+              animate={{ top: ['0%', '100%', '0%'] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+              className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent shadow-[0_0_15px_rgba(186,158,255,0.8)]"
+            />
+          </div>
+        </div>
       </div>
       <p className="text-white/60 text-center mt-8 text-sm">Align the QR code within the frame to scan</p>
     </div>
@@ -853,46 +891,23 @@ const UPI_APPS = [
 const UPIPaymentModal = ({ 
   upiData, 
   accounts, 
-  onPay, 
+  onContinue,
   onClose,
   currency 
 }: { 
   upiData: { upiId: string, name?: string, amount?: string }, 
   accounts: UPIAccount[], 
-  onPay: (amount: number, accountId: string) => void, 
+  onContinue: (amount: string, accountId: string) => void,
   onClose: () => void,
   currency: string
 }) => {
   const [amount, setAmount] = useState(upiData.amount || '');
   const [selectedAccountId, setSelectedAccountId] = useState(accounts.find(a => a.isDefault)?.id || accounts[0]?.id);
   const [isPaying, setIsPaying] = useState(false);
-  const [showAppChooser, setShowAppChooser] = useState(false);
-
-  const generateUPILink = (appPackage?: string) => {
-    const baseUrl = `upi://pay?pa=${upiData.upiId}&pn=${encodeURIComponent(upiData.name || 'Merchant')}&am=${amount}&cu=INR`;
-    if (appPackage) {
-      // Android intent to target specific app
-      return `intent://pay?pa=${upiData.upiId}&pn=${encodeURIComponent(upiData.name || 'Merchant')}&am=${amount}&cu=INR#Intent;scheme=upi;package=${appPackage};end`;
-    }
-    return baseUrl;
-  };
 
   const handlePay = () => {
     if (!amount || !selectedAccountId) return;
-    setShowAppChooser(true);
-  };
-
-  const executePayment = (appPackage?: string) => {
-    const link = generateUPILink(appPackage);
-    window.location.href = link;
-    
-    // Simulate recording the transaction in our app after a delay
-    setIsPaying(true);
-    setTimeout(() => {
-      onPay(parseFloat(amount), selectedAccountId);
-      setIsPaying(false);
-      onClose();
-    }, 2000);
+    onContinue(amount, selectedAccountId);
   };
 
   return (
@@ -966,58 +981,6 @@ const UPIPaymentModal = ({
           </>
         )}
       </button>
-
-      <AnimatePresence>
-        {showAppChooser && (
-          <div className="fixed inset-0 z-[200] flex items-end justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => setShowAppChooser(false)}
-            />
-            <motion.div 
-              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-              transition={SMOOTH_TRANSITION}
-              className="relative w-full max-w-md bg-surface-container-high rounded-t-[32px] p-8 pb-12 shadow-2xl border-t border-white/10"
-            >
-              <div className="flex justify-between items-center mb-8">
-                <h3 className="font-headline text-2xl font-bold">Choose UPI App</h3>
-                <button onClick={() => setShowAppChooser(false)} className="text-on-surface-variant"><X size={24} /></button>
-              </div>
-              
-              <div className="grid grid-cols-3 gap-6">
-                {UPI_APPS.map(app => (
-                  <button 
-                    key={app.id}
-                    onClick={() => executePayment(app.package)}
-                    className="flex flex-col items-center gap-3 active:scale-90 transition-transform"
-                  >
-                    <div className="w-16 h-16 bg-white rounded-2xl p-3 flex items-center justify-center shadow-lg border border-white/5">
-                      <img src={app.logo} alt={app.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-                    </div>
-                    <span className="text-[10px] font-bold text-center leading-tight">{app.name}</span>
-                  </button>
-                ))}
-                <button 
-                  onClick={() => executePayment()}
-                  className="flex flex-col items-center gap-3 active:scale-90 transition-transform"
-                >
-                  <div className="w-16 h-16 bg-surface-container rounded-2xl flex items-center justify-center shadow-lg border border-white/5">
-                    <LayoutGrid size={24} className="text-primary" />
-                  </div>
-                  <span className="text-[10px] font-bold text-center leading-tight">Other Apps</span>
-                </button>
-              </div>
-
-              <div className="mt-10 p-4 bg-primary/10 rounded-2xl border border-primary/20">
-                <p className="text-[10px] text-primary font-bold text-center leading-relaxed">
-                  Amount: ₹{parseFloat(amount).toLocaleString()} will be automatically filled in the selected app.
-                </p>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };
@@ -1230,6 +1193,34 @@ export default function App() {
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showUPIPaymentModal, setShowUPIPaymentModal] = useState(false);
+  const [showUPIAppChooser, setShowUPIAppChooser] = useState(false);
+  const [selectedUPIAccount, setSelectedUPIAccount] = useState<string | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+
+  const handleUPIContinue = (amount: string, accountId: string) => {
+    setPaymentAmount(amount);
+    setSelectedUPIAccount(accountId);
+    setShowUPIAppChooser(true);
+  };
+
+  const executeUPIPayment = (appPackage?: string) => {
+    if (!scannedUPI || !paymentAmount || !selectedUPIAccount) return;
+
+    const baseUrl = `upi://pay?pa=${scannedUPI.upiId}&pn=${encodeURIComponent(scannedUPI.name || 'Merchant')}&am=${paymentAmount}&cu=INR`;
+    const link = appPackage 
+      ? `intent://pay?pa=${scannedUPI.upiId}&pn=${encodeURIComponent(scannedUPI.name || 'Merchant')}&am=${paymentAmount}&cu=INR#Intent;scheme=upi;package=${appPackage};end`
+      : baseUrl;
+
+    window.location.href = link;
+    
+    // Record the transaction
+    setTimeout(() => {
+      handleUPIPay(parseFloat(paymentAmount), selectedUPIAccount);
+      setShowUPIAppChooser(false);
+      setShowUPIPaymentModal(false);
+      setScannedUPI(null);
+    }, 2000);
+  };
   const [showAddUPIModal, setShowAddUPIModal] = useState(false);
   const [scannedUPI, setScannedUPI] = useState<{ upiId: string, name?: string, amount?: string } | null>(null);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
@@ -1689,7 +1680,7 @@ export default function App() {
         unreadCount={unreadNotifications}
       />
 
-      <main className="pt-24 px-4 max-w-2xl mx-auto">
+      <main className="pt-24 px-4 pb-40 max-w-2xl mx-auto">
         {activeTab === 'home' && (
           <motion.div 
             initial={{ opacity: 0, y: 20 }} 
@@ -2524,12 +2515,66 @@ export default function App() {
           <UPIPaymentModal 
             upiData={scannedUPI} 
             accounts={upiAccounts} 
-            onPay={handleUPIPay} 
+            onContinue={handleUPIContinue} 
             onClose={() => setShowUPIPaymentModal(false)}
             currency={profile.currency}
           />
         )}
       </BottomSheet>
+
+      {/* UPI App Chooser Modal */}
+      <AnimatePresence>
+        {showUPIAppChooser && (
+          <div className="fixed inset-0 z-[200] flex items-end justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+              onClick={() => setShowUPIAppChooser(false)}
+            />
+            <motion.div 
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={SMOOTH_TRANSITION}
+              className="relative w-full max-w-md bg-surface-container-high rounded-t-[32px] p-8 pb-12 shadow-2xl border-t border-white/10"
+            >
+              <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-6" />
+              <div className="flex justify-between items-center mb-8">
+                <h3 className="font-headline text-2xl font-bold">Choose UPI App</h3>
+                <button onClick={() => setShowUPIAppChooser(false)} className="text-on-surface-variant"><X size={24} /></button>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-6">
+                {UPI_APPS.map(app => (
+                  <button 
+                    key={app.id}
+                    onClick={() => executeUPIPayment(app.package)}
+                    className="flex flex-col items-center gap-3 active:scale-90 transition-transform"
+                  >
+                    <div className="w-16 h-16 bg-white rounded-2xl p-3 flex items-center justify-center shadow-lg border border-white/5">
+                      <img src={app.logo} alt={app.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                    </div>
+                    <span className="text-[10px] font-bold text-center leading-tight">{app.name}</span>
+                  </button>
+                ))}
+                <button 
+                  onClick={() => executeUPIPayment()}
+                  className="flex flex-col items-center gap-3 active:scale-90 transition-transform"
+                >
+                  <div className="w-16 h-16 bg-surface-container rounded-2xl flex items-center justify-center shadow-lg border border-white/5">
+                    <LayoutGrid size={24} className="text-primary" />
+                  </div>
+                  <span className="text-[10px] font-bold text-center leading-tight">Other Apps</span>
+                </button>
+              </div>
+
+              <div className="mt-10 p-4 bg-primary/10 rounded-2xl border border-primary/20">
+                <p className="text-[10px] text-primary font-bold text-center leading-relaxed">
+                  Amount: ₹{parseFloat(paymentAmount || '0').toLocaleString()} will be automatically filled in the selected app.
+                </p>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <BottomSheet 
         isOpen={showAddUPIModal} 
