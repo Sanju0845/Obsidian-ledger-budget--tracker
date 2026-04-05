@@ -53,7 +53,9 @@ import {
   ArrowRightLeft,
   Users,
   HandCoins,
-  Search as SearchIcon
+  Search as SearchIcon,
+  Moon,
+  Sun
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -71,7 +73,7 @@ import {
   Legend
 } from 'recharts';
 import { cn } from './lib/utils';
-import { Transaction, Card, Budget, UserProfile, Notification, BANK_LOGOS, CARD_COLORS, SavingsGoal, UPIAccount, Bank } from './types';
+import { Transaction, Card, Budget, UserProfile, Notification, BANK_LOGOS, CARD_COLORS, UPIAccount, Bank } from './types';
 import { GoogleGenAI } from "@google/genai";
 import { Html5Qrcode } from "html5-qrcode";
 
@@ -95,11 +97,6 @@ const INITIAL_PROFILE: UserProfile = {
   currency: 'INR',
   theme: 'dark'
 };
-
-const INITIAL_SAVINGS: SavingsGoal[] = [
-  { id: '1', name: 'New iPhone', targetAmount: 80000, currentAmount: 15000, color: '#ba9eff', icon: 'ShoppingBag' },
-  { id: '2', name: 'Europe Trip', targetAmount: 250000, currentAmount: 45000, color: '#699cff', icon: 'Plane' },
-];
 
 const AVAILABLE_BANKS: Bank[] = [
   { id: 'sbi', name: 'State Bank of India', logo: BANK_LOGOS.sbi },
@@ -125,8 +122,10 @@ const CATEGORY_ICONS: Record<string, any> = {
 };
 
 // --- Animation Constants ---
-const SMOOTH_TRANSITION = { type: 'tween' as const, ease: 'easeOut' as const, duration: 0.2 };
+const SMOOTH_TRANSITION = { type: 'tween' as const, ease: 'easeInOut' as const, duration: 0.3 };
 const QUICK_TRANSITION = { type: 'tween' as const, ease: 'linear' as const, duration: 0.15 };
+const NO_DAMPING_TRANSITION = { type: 'tween' as const, ease: 'easeOut' as const, duration: 0.2 };
+const SPRING_CONFIG = { damping: 25, stiffness: 200 }; // Low damping for sharp feel
 
 // --- Bottom Sheet Component ---
 const BottomSheet = ({ 
@@ -251,73 +250,6 @@ const AppLock = ({ onUnlock, savedPin }: { onUnlock: () => void, savedPin: strin
         ))}
       </div>
     </motion.div>
-  );
-};
-
-// --- Savings View Component ---
-const SavingsView = ({ goals, currency }: { goals: SavingsGoal[], currency: string }) => {
-  return (
-    <div className="space-y-8 pb-32">
-      <div>
-        <h1 className="font-headline text-4xl font-bold">Savings</h1>
-        <p className="text-on-surface-variant text-sm">Track your progress towards goals</p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4">
-        {goals.map(goal => {
-          const percent = Math.min((goal.currentAmount / goal.targetAmount) * 100, 100);
-          return (
-            <div key={goal.id} className="bg-surface-container-low p-6 rounded-[32px] border border-white/5 shadow-xl relative overflow-hidden">
-              <div className="flex justify-between items-start mb-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${goal.color}20`, color: goal.color }}>
-                    {goal.icon === 'ShoppingBag' ? <ShoppingBag size={24} /> : <Plane size={24} />}
-                  </div>
-                  <div>
-                    <h3 className="font-headline font-bold text-lg">{goal.name}</h3>
-                    <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest">
-                      {formatCurrency(goal.currentAmount, currency)} of {formatCurrency(goal.targetAmount, currency)}
-                    </p>
-                  </div>
-                </div>
-                <span className="text-primary font-bold text-lg">{percent.toFixed(0)}%</span>
-              </div>
-
-              <div className="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden mb-4">
-                <motion.div 
-                  initial={{ width: 0 }}
-                  animate={{ width: `${percent}%` }}
-                  transition={SMOOTH_TRANSITION}
-                  className="h-full bg-primary"
-                  style={{ backgroundColor: goal.color }}
-                />
-              </div>
-
-              <div className="flex justify-between items-center">
-                <div className="flex -space-x-2">
-                  {[1, 2, 3].map(i => (
-                    <div key={i} className="w-6 h-6 rounded-full border-2 border-surface bg-surface-container-high overflow-hidden">
-                      <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${goal.id}${i}`} alt="Contributor" />
-                    </div>
-                  ))}
-                  <div className="w-6 h-6 rounded-full border-2 border-surface bg-primary/20 flex items-center justify-center text-[8px] font-bold text-primary">
-                    +12
-                  </div>
-                </div>
-                <button className="bg-white/5 hover:bg-white/10 px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-colors">
-                  Add Funds
-                </button>
-              </div>
-            </div>
-          );
-        })}
-
-        <button className="w-full h-32 rounded-[32px] border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-2 text-on-surface-variant hover:text-white hover:border-white/20 transition-all">
-          <Plus size={24} />
-          <span className="font-bold">Create New Goal</span>
-        </button>
-      </div>
-    </div>
   );
 };
 
@@ -721,7 +653,7 @@ const BottomNavBar = ({ activeTab, onTabChange }: { activeTab: string, onTabChan
   const tabs = [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'budget', label: 'Budget', icon: Wallet },
-    { id: 'upi', label: 'UPI', icon: Scan },
+    { id: 'scan', label: 'Scan', icon: Scan },
     { id: 'transactions', label: 'Ledger', icon: ReceiptText },
     { id: 'profile', label: 'Settings', icon: Settings },
   ];
@@ -732,7 +664,7 @@ const BottomNavBar = ({ activeTab, onTabChange }: { activeTab: string, onTabChan
       <div className="absolute inset-x-0 bottom-0 h-32 glass-nav pointer-events-auto" />
       
       <div className="relative flex justify-around items-center px-8 pb-10 pt-4 pointer-events-none">
-        <div className="glass-header rounded-full w-full max-w-md h-16 flex justify-around items-center px-4 shadow-2xl pointer-events-auto border border-white/10">
+        <div className="glass-capsule rounded-full w-full max-w-md h-16 flex justify-around items-center px-4 shadow-2xl pointer-events-auto border border-white/10">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -1339,10 +1271,6 @@ export default function App() {
     const saved = localStorage.getItem('obsidian_budgets');
     return saved ? JSON.parse(saved) : INITIAL_BUDGETS;
   });
-  const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>(() => {
-    const saved = localStorage.getItem('obsidian_savings');
-    return saved ? JSON.parse(saved) : INITIAL_SAVINGS;
-  });
   const [upiAccounts, setUpiAccounts] = useState<UPIAccount[]>(() => {
     const saved = localStorage.getItem('obsidian_upi_accounts');
     return saved ? JSON.parse(saved) : [];
@@ -1431,10 +1359,6 @@ export default function App() {
   }, [budgets]);
 
   useEffect(() => {
-    localStorage.setItem('obsidian_savings', JSON.stringify(savingsGoals));
-  }, [savingsGoals]);
-
-  useEffect(() => {
     localStorage.setItem('obsidian_profile', JSON.stringify(profile));
   }, [profile]);
 
@@ -1450,16 +1374,44 @@ export default function App() {
     localStorage.setItem('obsidian_upi_accounts', JSON.stringify(upiAccounts));
   }, [upiAccounts]);
 
+  // Theme support
   useEffect(() => {
-    // Apply theme to document
     if (profile.theme === 'light') {
-      document.documentElement.classList.remove('dark');
       document.documentElement.classList.add('light');
+      document.documentElement.style.setProperty('--color-surface', '#f8f9fa');
+      document.documentElement.style.setProperty('--color-surface-container', '#ffffff');
+      document.documentElement.style.setProperty('--color-surface-container-low', '#f1f3f5');
+      document.documentElement.style.setProperty('--color-surface-container-high', '#e9ecef');
+      document.documentElement.style.setProperty('--color-on-surface', '#212529');
+      document.documentElement.style.setProperty('--color-on-surface-variant', '#495057');
     } else {
       document.documentElement.classList.remove('light');
-      document.documentElement.classList.add('dark');
+      document.documentElement.style.setProperty('--color-surface', '#000000');
+      document.documentElement.style.setProperty('--color-surface-container', '#0a0a0a');
+      document.documentElement.style.setProperty('--color-surface-container-low', '#050505');
+      document.documentElement.style.setProperty('--color-surface-container-high', '#121212');
+      document.documentElement.style.setProperty('--color-on-surface', '#ffffff');
+      document.documentElement.style.setProperty('--color-on-surface-variant', '#a1a1a1');
     }
   }, [profile.theme]);
+
+  // Back button handling
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (e.state && e.state.tab) {
+        setActiveTab(e.state.tab);
+      } else {
+        setActiveTab('home');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    window.history.pushState({ tab }, '', `#${tab}`);
+  };
 
   useEffect(() => {
     // Welcome notification for first-time users
@@ -1727,13 +1679,16 @@ export default function App() {
           "merchant": string, 
           "category": string, 
           "bank": string,
-          "last4": string (4 digits if found)
+          "last4": string (4 digits if found),
+          "date": string (ISO format if found),
+          "description": string
         }
         Context:
-        - If it's a debit/payment/spent, type is expense.
-        - If credit/received/deposited, type is income.
+        - If it's a debit/payment/spent/sent/paid, type is expense.
+        - If credit/received/deposited/added, type is income.
         - Categories: Dining, Tech, Utilities, Entertainment, Transport, Health, Shopping, Travel, Fun, Study.
-        - Bank: Try to identify the bank name (e.g. HDFC, SBI, ICICI).
+        - Bank: Try to identify the bank name (e.g. HDFC, SBI, ICICI, AXIS, KOTAK).
+        - Merchant: The person or account paid to or received from.
         Return ONLY the JSON.`,
       });
 
@@ -1882,11 +1837,11 @@ export default function App() {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-10">
               <button 
-                onClick={() => setShowQRScanner(true)}
+                onClick={() => handleTabChange('upi')}
                 className="glass-header rounded-xl py-4 flex flex-col items-center justify-center gap-2 hover:bg-surface-container transition-colors border-primary/20 border"
               >
-                <Scan className="text-primary" size={20} />
-                <span className="font-label text-[10px] font-bold text-on-surface uppercase tracking-wider">Scan & Pay</span>
+                <Wallet className="text-primary" size={20} />
+                <span className="font-label text-[10px] font-bold text-on-surface uppercase tracking-wider">UPI Accounts</span>
               </button>
               <button 
                 onClick={() => setShowSmsModal(true)}
@@ -1913,55 +1868,33 @@ export default function App() {
 
             <section className="mb-10">
               <div className="flex justify-between items-end mb-4 px-2">
-                <h2 className="font-headline text-2xl font-bold">Savings Goals</h2>
-                <span className="text-primary text-sm font-bold cursor-pointer" onClick={() => setActiveTab('budget')}>View All</span>
-              </div>
-              <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
-                {savingsGoals.map(goal => (
-                  <div key={goal.id} className="min-w-[240px] bg-surface-container-low p-6 rounded-[32px] border border-white/5 shadow-xl">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                        <Target size={20} />
-                      </div>
-                      <span className="text-[10px] font-bold text-primary uppercase tracking-widest">{Math.round(((goal.currentAmount || 0) / (goal.targetAmount || 1)) * 100)}%</span>
-                    </div>
-                    <h3 className="font-headline font-bold mb-1">{goal.name}</h3>
-                    <p className="text-xl font-bold mb-4">₹{(goal.currentAmount || 0).toLocaleString()} <span className="text-xs text-on-surface-variant font-normal">/ ₹{(goal.targetAmount || 0).toLocaleString()}</span></p>
-                    <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${((goal.currentAmount || 0) / (goal.targetAmount || 1)) * 100}%` }}
-                        transition={SMOOTH_TRANSITION}
-                        className="h-full bg-primary"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="mb-10">
-              <div className="flex justify-between items-end mb-4 px-2">
                 <h2 className="font-headline text-2xl font-bold">Quick Transfer</h2>
                 <span className="text-primary text-sm font-bold cursor-pointer">View All</span>
               </div>
               <div className="flex gap-6 overflow-x-auto no-scrollbar pb-2">
-                {[1, 2, 3, 4, 5].map(i => (
-                  <div key={i} className="flex flex-col items-center gap-2 flex-shrink-0 cursor-pointer active:scale-90 transition-transform">
-                    <div className="w-16 h-16 rounded-full border-2 border-primary/20 p-1 bg-surface-container-low">
-                      <img 
-                        src={`https://api.dicebear.com/7.x/avataaars/svg?seed=Contact${i}`} 
-                        alt="Contact" 
-                        className="w-full h-full rounded-full object-cover"
-                        referrerPolicy="no-referrer"
-                      />
+                {[
+                  { name: 'Aman', upi: 'aman@paytm', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aman' },
+                  { name: 'Priya', upi: 'priya@okaxis', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Priya' },
+                  { name: 'Rahul', upi: 'rahul@ybl', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Rahul' },
+                  { name: 'Sneha', upi: 'sneha@oksbi', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sneha' },
+                  { name: 'Vikram', upi: 'vikram@okicici', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Vikram' }
+                ].map((contact, i) => (
+                  <button 
+                    key={i} 
+                    onClick={() => {
+                      setScannedUPI({ upiId: contact.upi, name: contact.name });
+                      setShowUPIPaymentModal(true);
+                    }}
+                    className="flex flex-col items-center gap-3 active:scale-90 transition-transform min-w-[70px]"
+                  >
+                    <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-primary to-secondary">
+                      <div className="w-full h-full rounded-full border-2 border-surface overflow-hidden">
+                        <img src={contact.avatar} alt={contact.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      </div>
                     </div>
-                    <span className="text-[10px] font-bold text-on-surface-variant">Contact {i}</span>
-                  </div>
+                    <span className="text-[10px] font-bold text-on-surface-variant">{contact.name}</span>
+                  </button>
                 ))}
-                <button className="w-16 h-16 rounded-full border-2 border-dashed border-white/10 flex items-center justify-center text-on-surface-variant flex-shrink-0">
-                  <Plus size={24} />
-                </button>
               </div>
             </section>
 
@@ -2168,6 +2101,27 @@ export default function App() {
               <div className="bg-surface-container-low p-6 rounded-2xl border border-white/5 space-y-4">
                 <h3 className="font-headline font-bold text-sm uppercase tracking-widest text-on-surface-variant">Core Features</h3>
                 
+                <div className="flex justify-between items-center py-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                      {profile.theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold">Dark Mode</span>
+                      <span className="text-[10px] text-on-surface-variant capitalize">{profile.theme} Mode Enabled</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setProfile({ ...profile, theme: profile.theme === 'dark' ? 'light' : 'dark' })}
+                    className="w-12 h-6 rounded-full bg-surface-container-high relative transition-colors"
+                  >
+                    <motion.div 
+                      animate={{ x: profile.theme === 'dark' ? 24 : 4 }}
+                      className="absolute top-1 w-4 h-4 rounded-full bg-primary shadow-lg"
+                    />
+                  </button>
+                </div>
+
                 <div className="flex justify-between items-center py-2">
                   <div className="flex items-center gap-3">
                     <Scan size={18} className="text-primary" />

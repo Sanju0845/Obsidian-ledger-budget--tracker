@@ -22,12 +22,36 @@
 }
 
 @layer base {
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  
+  *::-webkit-scrollbar {
+    display: none;
+  }
+
   body {
     @apply bg-surface text-on-surface font-sans selection:bg-primary selection:text-surface;
     min-height: 100dvh;
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior-y: none;
+    overflow-x: hidden;
   }
+}
+
+.glass-capsule {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.glass-capsule-light {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
 }
 
 .glass-header {
