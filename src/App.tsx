@@ -321,7 +321,7 @@ const AnalyticsView = ({ transactions, profile, budgets }: { transactions: Trans
             </div>
           </div>
         </div>
-        <div className="h-64 w-full">
+        <div className="h-64 w-full min-h-[256px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData}>
               <defs>
@@ -352,7 +352,7 @@ const AnalyticsView = ({ transactions, profile, budgets }: { transactions: Trans
         {/* Category Distribution */}
         <div className="bg-surface-container-low p-6 rounded-[32px] border border-white/5">
           <h3 className="font-headline font-bold text-lg mb-6">Spending by Category</h3>
-          <div className="h-64 w-full flex items-center justify-center">
+          <div className="h-64 w-full flex items-center justify-center min-h-[256px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -376,7 +376,7 @@ const AnalyticsView = ({ transactions, profile, budgets }: { transactions: Trans
           </div>
           <div className="grid grid-cols-2 gap-2 mt-4">
             {categoryPieData.map((entry, index) => (
-              <div key={entry.name} className="flex items-center gap-2">
+              <div key={`${entry.name}-${index}`} className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
                 <span className="text-[10px] font-bold truncate">{entry.name}</span>
               </div>
@@ -509,7 +509,7 @@ const TopAppBar = ({ profile, onProfileClick, onNotificationsClick, unreadCount 
           referrerPolicy="no-referrer"
         />
       </div>
-      <span className="ml-3 mr-4 font-headline font-bold text-white text-sm tracking-tight">{profile.name} v1.7.</span>
+      <span className="ml-3 mr-4 font-headline font-bold text-white text-sm tracking-tight">{profile.name} v1.8.</span>
     </div>
     <div className="flex gap-2">
       <button 
@@ -889,7 +889,7 @@ const UPIPaymentModal = ({
   const [amount, setAmount] = useState(upiData.amount || '');
   const [selectedAccountId, setSelectedAccountId] = useState(accounts.find(a => a.isDefault)?.id || accounts[0]?.id || cards[0]?.id);
   const [isPaying, setIsPaying] = useState(false);
-  const [activeTab, setActiveTab] = useState<'internal' | 'apps'>('internal');
+  const [activeTab, setActiveTab] = useState<'internal' | 'apps'>('apps');
 
   const handlePay = (appPackage?: string) => {
     if (!amount) return;
@@ -928,16 +928,6 @@ const UPIPaymentModal = ({
 
       <div className="flex bg-surface-container rounded-full p-1 border border-white/5">
         <button 
-          onClick={() => setActiveTab('internal')}
-          className={cn(
-            "flex-1 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2",
-            activeTab === 'internal' ? "bg-primary text-surface shadow-lg" : "text-on-surface-variant"
-          )}
-        >
-          <Wallet size={14} />
-          Accounts & Cards
-        </button>
-        <button 
           onClick={() => setActiveTab('apps')}
           className={cn(
             "flex-1 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2",
@@ -947,11 +937,51 @@ const UPIPaymentModal = ({
           <Smartphone size={14} />
           UPI Apps
         </button>
+        <button 
+          onClick={() => setActiveTab('internal')}
+          className={cn(
+            "flex-1 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2",
+            activeTab === 'internal' ? "bg-primary text-surface shadow-lg" : "text-on-surface-variant"
+          )}
+        >
+          <Wallet size={14} />
+          Accounts & Cards
+        </button>
       </div>
 
       <div className="relative overflow-hidden min-h-[280px]">
         <AnimatePresence mode="wait">
-          {activeTab === 'internal' ? (
+          {activeTab === 'apps' ? (
+            <motion.div 
+              key="apps"
+              initial={{ x: 20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -20, opacity: 0 }}
+              drag="x"
+              dragConstraints={{ left: 0, right: 0 }}
+              onDragEnd={(_, info) => {
+                if (info.offset.x < -50) setActiveTab('internal');
+              }}
+              className="grid grid-cols-2 gap-3"
+            >
+              {UPI_APPS.map(app => (
+                <button 
+                  key={app.package}
+                  disabled={!amount}
+                  onClick={() => handlePay(app.package)}
+                  className={cn(
+                    "p-4 rounded-2xl bg-surface-container border border-white/5 flex flex-col items-center justify-center gap-3 hover:bg-surface-container-high transition-all active:scale-95",
+                    !amount && "opacity-50 grayscale"
+                  )}
+                >
+                  <div className="w-12 h-12 rounded-xl bg-white p-2 flex items-center justify-center overflow-hidden">
+                    <img src={app.icon} alt={app.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                  </div>
+                  <span className="font-bold text-[10px] uppercase tracking-wider">{app.name}</span>
+                </button>
+              ))}
+            </motion.div>
+          ) : (
             <motion.div 
               key="internal"
               initial={{ x: -20, opacity: 0 }}
@@ -960,7 +990,7 @@ const UPIPaymentModal = ({
               drag="x"
               dragConstraints={{ left: 0, right: 0 }}
               onDragEnd={(_, info) => {
-                if (info.offset.x < -50) setActiveTab('apps');
+                if (info.offset.x > 50) setActiveTab('apps');
               }}
               className="space-y-2"
             >
@@ -1031,49 +1061,6 @@ const UPIPaymentModal = ({
               >
                 <Zap size={18} />
                 Continue to Payment
-              </button>
-            </motion.div>
-          ) : (
-            <motion.div 
-              key="apps"
-              initial={{ x: 20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: -20, opacity: 0 }}
-              drag="x"
-              dragConstraints={{ left: 0, right: 0 }}
-              onDragEnd={(_, info) => {
-                if (info.offset.x > 50) setActiveTab('internal');
-              }}
-              className="grid grid-cols-2 gap-3"
-            >
-              {UPI_APPS.map(app => (
-                <button 
-                  key={app.package}
-                  disabled={!amount}
-                  onClick={() => handlePay(app.package)}
-                  className={cn(
-                    "p-4 rounded-2xl bg-surface-container border border-white/5 flex flex-col items-center justify-center gap-3 hover:bg-surface-container-high transition-all active:scale-95",
-                    !amount && "opacity-50 grayscale"
-                  )}
-                >
-                  <div className="w-12 h-12 rounded-xl bg-white p-2 flex items-center justify-center overflow-hidden">
-                    <img src={app.icon} alt={app.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-                  </div>
-                  <span className="font-bold text-[10px] text-on-surface uppercase tracking-wider">{app.name}</span>
-                </button>
-              ))}
-              <button 
-                disabled={!amount}
-                onClick={() => handlePay()}
-                className={cn(
-                  "p-4 rounded-2xl bg-primary/10 border border-primary/20 flex flex-col items-center justify-center gap-3 hover:bg-primary/20 transition-all active:scale-95",
-                  !amount && "opacity-50 grayscale"
-                )}
-              >
-                <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center text-primary">
-                  <Smartphone size={24} />
-                </div>
-                <span className="font-bold text-[10px] text-primary uppercase tracking-wider">Other Apps</span>
               </button>
             </motion.div>
           )}
@@ -1409,6 +1396,10 @@ export default function App() {
   }, []);
 
   const handleTabChange = (tab: string) => {
+    if (tab === 'scan') {
+      setShowQRScanner(true);
+      return;
+    }
     setActiveTab(tab);
     window.history.pushState({ tab }, '', `#${tab}`);
   };
@@ -2271,7 +2262,7 @@ export default function App() {
         )}
       </main>
 
-      <BottomNavBar activeTab={activeTab} onTabChange={setActiveTab} />
+      <BottomNavBar activeTab={activeTab} onTabChange={handleTabChange} />
 
       {/* Modals using BottomSheet */}
       <BottomSheet 

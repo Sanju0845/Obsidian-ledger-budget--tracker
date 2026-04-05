@@ -18,10 +18,12 @@
           // If non-configurable, we must catch the error globally
           const suppressFetchError = (event) => {
             const msg = event.message || (event.reason && event.reason.message);
-            if (msg && typeof msg === 'string' && msg.includes('fetch') && msg.includes('getter')) {
-              if (event.preventDefault) event.preventDefault();
-              if (event.stopImmediatePropagation) event.stopImmediatePropagation();
-              return true;
+            if (msg && typeof msg === 'string' && (msg.includes('fetch') || msg.includes('getter'))) {
+              if (msg.includes('property fetch') || msg.includes('only a getter')) {
+                if (event.preventDefault) event.preventDefault();
+                if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+                return true;
+              }
             }
           };
           window.addEventListener('error', suppressFetchError, true);
