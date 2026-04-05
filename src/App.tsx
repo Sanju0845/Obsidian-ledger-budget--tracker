@@ -35,6 +35,7 @@ import {
   Edit2,
   Check,
   RefreshCw,
+  Smartphone,
   TrendingUp,
   TrendingDown,
   PieChart as PieChartIcon,
@@ -929,16 +930,17 @@ const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClos
 };
 
 const UPI_APPS = [
-  { id: 'gpay', name: 'Google Pay', package: 'com.google.android.apps.nbu.paisa.user', logo: 'https://upload.wikimedia.org/wikipedia/commons/f/f2/Google_Pay_Logo.svg' },
-  { id: 'phonepe', name: 'PhonePe', package: 'com.phonepe.app', logo: 'https://upload.wikimedia.org/wikipedia/commons/7/71/PhonePe_Logo.svg' },
-  { id: 'paytm', name: 'Paytm', package: 'net.one97.paytm', logo: 'https://upload.wikimedia.org/wikipedia/commons/2/24/Paytm_Logo_%28standalone%29.svg' },
-  { id: 'amazonpay', name: 'Amazon Pay', package: 'in.amazon.mShop.android.shopping', logo: 'https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg' },
-  { id: 'bhim', name: 'BHIM', package: 'in.org.npci.upiapp', logo: 'https://upload.wikimedia.org/wikipedia/commons/e/e1/BHIM_Logo.png' },
+  { name: 'Google Pay', package: 'com.google.android.apps.nbu.paisa.user', icon: 'https://www.gstatic.com/images/branding/product/2x/gpay_64dp.png' },
+  { name: 'PhonePe', package: 'com.phonepe.app', icon: 'https://phonepe.com/en/assets/img/phonepe-logo.png' },
+  { name: 'Paytm', package: 'net.one97.paytm', icon: 'https://static.paytm.com/common/images/paytm-logo.png' },
+  { name: 'Amazon Pay', package: 'in.amazon.mShop.android.shopping', icon: 'https://m.media-amazon.com/images/G/31/AmazonPay/Logo/AmazonPay_Logo_White._CB485933534_.png' },
+  { name: 'BHIM', package: 'in.org.npci.upiapp', icon: 'https://www.bhimupi.org.in/assets/images/bhim-logo.png' },
 ];
 
 const UPIPaymentModal = ({ 
   upiData, 
   accounts, 
+  cards,
   onContinue,
   onClose,
   onAddAccount,
@@ -946,32 +948,34 @@ const UPIPaymentModal = ({
 }: { 
   upiData: { upiId: string, name?: string, amount?: string }, 
   accounts: UPIAccount[], 
-  onContinue: (amount: string, accountId: string) => void,
+  cards: Card[],
+  onContinue: (amount: string, accountId: string, appPackage?: string) => void,
   onClose: () => void,
   onAddAccount: () => void,
   currency: string
 }) => {
   const [amount, setAmount] = useState(upiData.amount || '');
-  const [selectedAccountId, setSelectedAccountId] = useState(accounts.find(a => a.isDefault)?.id || accounts[0]?.id);
+  const [selectedAccountId, setSelectedAccountId] = useState(accounts.find(a => a.isDefault)?.id || accounts[0]?.id || cards[0]?.id);
   const [isPaying, setIsPaying] = useState(false);
+  const [activeTab, setActiveTab] = useState<'internal' | 'apps'>('internal');
 
-  const handlePay = () => {
+  const handlePay = (appPackage?: string) => {
     if (!amount) return;
-    if (!selectedAccountId) {
+    if (!selectedAccountId && activeTab === 'internal') {
       onAddAccount();
       return;
     }
-    onContinue(amount, selectedAccountId);
+    onContinue(amount, selectedAccountId || 'direct', appPackage);
   };
 
   return (
     <div className="space-y-6">
-      <div className="text-center py-4">
-        <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-          <ArrowUpRight size={32} className="text-primary" />
+      <div className="text-center py-2">
+        <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-2">
+          <ArrowUpRight size={28} className="text-primary" />
         </div>
-        <h3 className="font-headline text-xl font-bold">{upiData.name || 'Paying to'}</h3>
-        <p className="text-on-surface-variant text-sm">{upiData.upiId}</p>
+        <h3 className="font-headline text-lg font-bold">{upiData.name || 'Paying to'}</h3>
+        <p className="text-on-surface-variant text-xs">{upiData.upiId}</p>
       </div>
 
       <div className="space-y-2">
@@ -985,79 +989,164 @@ const UPIPaymentModal = ({
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
-            className="w-full bg-surface-container h-16 rounded-2xl pl-12 pr-4 text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className="w-full bg-surface-container h-14 rounded-2xl pl-12 pr-4 text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
         </div>
       </div>
 
-      <div className="space-y-2">
-        <label className="text-[10px] uppercase font-bold text-on-surface-variant tracking-widest ml-1">Pay From</label>
-        <div className="space-y-2">
-          {accounts.length === 0 ? (
-            <div className="p-1 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-2xl">
+      <div className="flex bg-surface-container rounded-full p-1 border border-white/5">
+        <button 
+          onClick={() => setActiveTab('internal')}
+          className={cn(
+            "flex-1 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2",
+            activeTab === 'internal' ? "bg-primary text-surface shadow-lg" : "text-on-surface-variant"
+          )}
+        >
+          <Wallet size={14} />
+          Accounts & Cards
+        </button>
+        <button 
+          onClick={() => setActiveTab('apps')}
+          className={cn(
+            "flex-1 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2",
+            activeTab === 'apps' ? "bg-primary text-surface shadow-lg" : "text-on-surface-variant"
+          )}
+        >
+          <Smartphone size={14} />
+          UPI Apps
+        </button>
+      </div>
+
+      <div className="relative overflow-hidden min-h-[280px]">
+        <AnimatePresence mode="wait">
+          {activeTab === 'internal' ? (
+            <motion.div 
+              key="internal"
+              initial={{ x: -20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 20, opacity: 0 }}
+              drag="x"
+              dragConstraints={{ left: 0, right: 0 }}
+              onDragEnd={(_, info) => {
+                if (info.offset.x < -50) setActiveTab('apps');
+              }}
+              className="space-y-2"
+            >
+              <div className="max-h-[200px] overflow-y-auto no-scrollbar space-y-2">
+                {accounts.length === 0 && cards.length === 0 ? (
+                  <button 
+                    onClick={onAddAccount}
+                    className="w-full p-6 rounded-2xl bg-surface-container border border-white/5 flex flex-col items-center justify-center gap-2 text-primary hover:bg-surface-container-high transition-all active:scale-95"
+                  >
+                    <Plus size={24} />
+                    <span className="font-bold text-sm">Link Account or Card</span>
+                  </button>
+                ) : (
+                  <>
+                    {accounts.map(acc => (
+                      <button 
+                        key={acc.id}
+                        onClick={() => setSelectedAccountId(acc.id)}
+                        className={cn(
+                          "w-full p-3 rounded-xl border flex items-center justify-between transition-all",
+                          selectedAccountId === acc.id ? "bg-primary/10 border-primary" : "bg-surface-container border-transparent"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
+                            <Wallet size={16} className="text-primary" />
+                          </div>
+                          <div className="text-left">
+                            <p className="font-bold text-xs">{acc.bankName}</p>
+                            <p className="text-[10px] text-on-surface-variant">{acc.upiId}</p>
+                          </div>
+                        </div>
+                        {selectedAccountId === acc.id && <Check size={14} className="text-primary" />}
+                      </button>
+                    ))}
+                    {cards.map(card => (
+                      <button 
+                        key={card.id}
+                        onClick={() => setSelectedAccountId(card.id)}
+                        className={cn(
+                          "w-full p-3 rounded-xl border flex items-center justify-between transition-all",
+                          selectedAccountId === card.id ? "bg-primary/10 border-primary" : "bg-surface-container border-transparent"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
+                            <CreditCard size={16} className="text-secondary" />
+                          </div>
+                          <div className="text-left">
+                            <p className="font-bold text-xs">{card.bank}</p>
+                            <p className="text-[10px] text-on-surface-variant">•••• {card.last4}</p>
+                          </div>
+                        </div>
+                        {selectedAccountId === card.id && <Check size={14} className="text-primary" />}
+                      </button>
+                    ))}
+                  </>
+                )}
+              </div>
+              
               <button 
-                onClick={onAddAccount}
-                className="w-full p-6 rounded-xl bg-surface-container border border-white/5 flex flex-col items-center justify-center gap-2 text-primary hover:bg-surface-container-high transition-all active:scale-95"
-              >
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Plus size={24} />
-                </div>
-                <span className="font-bold text-sm">Link Bank Account</span>
-                <span className="text-[10px] text-on-surface-variant font-normal">Required to complete payment</span>
-              </button>
-            </div>
-          ) : (
-            accounts.map(acc => (
-              <button 
-                key={acc.id}
-                onClick={() => setSelectedAccountId(acc.id)}
+                disabled={!amount || isPaying}
+                onClick={() => handlePay()}
                 className={cn(
-                  "w-full p-4 rounded-2xl border flex items-center justify-between transition-all",
-                  selectedAccountId === acc.id ? "bg-primary/10 border-primary shadow-[0_0_20px_rgba(186,158,255,0.1)]" : "bg-surface-container border-transparent"
+                  "w-full h-14 rounded-2xl font-bold text-sm flex items-center justify-center gap-3 transition-all active:scale-95 mt-4",
+                  !amount || isPaying ? "bg-white/5 text-white/20 grayscale" : "bg-primary text-surface shadow-lg"
                 )}
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-                    <Wallet size={20} className="text-primary" />
-                  </div>
-                  <div className="text-left">
-                    <p className="font-bold text-sm">{acc.bankName}</p>
-                    <p className="text-[10px] text-on-surface-variant">{acc.upiId}</p>
-                  </div>
-                </div>
-                <div className={cn(
-                  "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
-                  selectedAccountId === acc.id ? "bg-primary border-primary" : "border-white/10"
-                )}>
-                  {selectedAccountId === acc.id && <Check size={14} className="text-surface font-bold" />}
-                </div>
+                <Zap size={18} />
+                Continue to Payment
               </button>
-            ))
+            </motion.div>
+          ) : (
+            <motion.div 
+              key="apps"
+              initial={{ x: 20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -20, opacity: 0 }}
+              drag="x"
+              dragConstraints={{ left: 0, right: 0 }}
+              onDragEnd={(_, info) => {
+                if (info.offset.x > 50) setActiveTab('internal');
+              }}
+              className="grid grid-cols-2 gap-3"
+            >
+              {UPI_APPS.map(app => (
+                <button 
+                  key={app.package}
+                  disabled={!amount}
+                  onClick={() => handlePay(app.package)}
+                  className={cn(
+                    "p-4 rounded-2xl bg-surface-container border border-white/5 flex flex-col items-center justify-center gap-3 hover:bg-surface-container-high transition-all active:scale-95",
+                    !amount && "opacity-50 grayscale"
+                  )}
+                >
+                  <div className="w-12 h-12 rounded-xl bg-white p-2 flex items-center justify-center overflow-hidden">
+                    <img src={app.icon} alt={app.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                  </div>
+                  <span className="font-bold text-[10px] text-on-surface uppercase tracking-wider">{app.name}</span>
+                </button>
+              ))}
+              <button 
+                disabled={!amount}
+                onClick={() => handlePay()}
+                className={cn(
+                  "p-4 rounded-2xl bg-primary/10 border border-primary/20 flex flex-col items-center justify-center gap-3 hover:bg-primary/20 transition-all active:scale-95",
+                  !amount && "opacity-50 grayscale"
+                )}
+              >
+                <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center text-primary">
+                  <Smartphone size={24} />
+                </div>
+                <span className="font-bold text-[10px] text-primary uppercase tracking-wider">Other Apps</span>
+              </button>
+            </motion.div>
           )}
-        </div>
+        </AnimatePresence>
       </div>
-
-      <button 
-        disabled={!amount || isPaying}
-        onClick={handlePay}
-        className={cn(
-          "w-full h-16 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition-all active:scale-95",
-          !amount || isPaying ? "bg-white/5 text-white/20 grayscale" : "bg-primary text-surface shadow-[0_8px_32px_rgba(186,158,255,0.3)]"
-        )}
-      >
-        {isPaying ? (
-          <motion.div 
-            animate={{ rotate: 360 }} 
-            transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-            className="w-6 h-6 border-2 border-surface border-t-transparent rounded-full"
-          />
-        ) : (
-          <>
-            <Zap size={20} />
-            {accounts.length === 0 ? "Link Account to Pay" : "Continue to Payment"}
-          </>
-        )}
-      </button>
     </div>
   );
 };
@@ -1271,20 +1360,23 @@ export default function App() {
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showUPIPaymentModal, setShowUPIPaymentModal] = useState(false);
-  const [showUPIAppChooser, setShowUPIAppChooser] = useState(false);
   const [selectedUPIAccount, setSelectedUPIAccount] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
 
-  const handleUPIContinue = (amount: string, accountId: string) => {
+  const handleUPIContinue = (amount: string, accountId: string, appPackage?: string) => {
     setPaymentAmount(amount);
     setSelectedUPIAccount(accountId);
     setShowUPIPaymentModal(false); 
     
-    // Directly trigger native UPI chooser after a short delay to ensure modal is closed
+    // Directly trigger native UPI chooser or specific app after a short delay
     setTimeout(() => {
       if (scannedUPI) {
         const baseUrl = `upi://pay?pa=${scannedUPI.upiId}&pn=${encodeURIComponent(scannedUPI.name || 'Merchant')}&am=${amount}&cu=INR`;
-        window.location.href = baseUrl;
+        const link = appPackage 
+          ? `intent://pay?pa=${scannedUPI.upiId}&pn=${encodeURIComponent(scannedUPI.name || 'Merchant')}&am=${amount}&cu=INR#Intent;scheme=upi;package=${appPackage};end`
+          : baseUrl;
+          
+        window.location.href = link;
         
         // Record the transaction
         handleUPIPay(parseFloat(amount), accountId);
@@ -1293,24 +1385,6 @@ export default function App() {
     }, 300);
   };
 
-  const executeUPIPayment = (appPackage?: string) => {
-    if (!scannedUPI || !paymentAmount || !selectedUPIAccount) return;
-
-    const baseUrl = `upi://pay?pa=${scannedUPI.upiId}&pn=${encodeURIComponent(scannedUPI.name || 'Merchant')}&am=${paymentAmount}&cu=INR`;
-    const link = appPackage 
-      ? `intent://pay?pa=${scannedUPI.upiId}&pn=${encodeURIComponent(scannedUPI.name || 'Merchant')}&am=${paymentAmount}&cu=INR#Intent;scheme=upi;package=${appPackage};end`
-      : baseUrl;
-
-    window.location.href = link;
-    
-    // Record the transaction
-    setTimeout(() => {
-      handleUPIPay(parseFloat(paymentAmount), selectedUPIAccount);
-      setShowUPIAppChooser(false);
-      setShowUPIPaymentModal(false);
-      setScannedUPI(null);
-    }, 2000);
-  };
   const [showAddUPIModal, setShowAddUPIModal] = useState(false);
   const [scannedUPI, setScannedUPI] = useState<{ upiId: string, name?: string, amount?: string } | null>(null);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
@@ -2650,6 +2724,7 @@ export default function App() {
           <UPIPaymentModal 
             upiData={scannedUPI} 
             accounts={upiAccounts} 
+            cards={cards}
             onContinue={handleUPIContinue} 
             onClose={() => setShowUPIPaymentModal(false)}
             onAddAccount={() => {
@@ -2660,60 +2735,6 @@ export default function App() {
           />
         )}
       </BottomSheet>
-
-      {/* UPI App Chooser Modal */}
-      <AnimatePresence>
-        {showUPIAppChooser && (
-          <div className="fixed inset-0 z-[200] flex items-end justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/80 backdrop-blur-md"
-              onClick={() => setShowUPIAppChooser(false)}
-            />
-            <motion.div 
-              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-              transition={SMOOTH_TRANSITION}
-              className="relative w-full max-w-md bg-surface-container-high rounded-t-[32px] p-8 pb-12 shadow-2xl border-t border-white/10"
-            >
-              <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-6" />
-              <div className="flex justify-between items-center mb-8">
-                <h3 className="font-headline text-2xl font-bold">Choose UPI App</h3>
-                <button onClick={() => setShowUPIAppChooser(false)} className="text-on-surface-variant"><X size={24} /></button>
-              </div>
-              
-              <div className="grid grid-cols-3 gap-6">
-                {UPI_APPS.map(app => (
-                  <button 
-                    key={app.id}
-                    onClick={() => executeUPIPayment(app.package)}
-                    className="flex flex-col items-center gap-3 active:scale-90 transition-transform"
-                  >
-                    <div className="w-16 h-16 bg-white rounded-2xl p-3 flex items-center justify-center shadow-lg border border-white/5">
-                      <img src={app.logo} alt={app.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-                    </div>
-                    <span className="text-[10px] font-bold text-center leading-tight">{app.name}</span>
-                  </button>
-                ))}
-                <button 
-                  onClick={() => executeUPIPayment()}
-                  className="flex flex-col items-center gap-3 active:scale-90 transition-transform"
-                >
-                  <div className="w-16 h-16 bg-surface-container rounded-2xl flex items-center justify-center shadow-lg border border-white/5">
-                    <LayoutGrid size={24} className="text-primary" />
-                  </div>
-                  <span className="text-[10px] font-bold text-center leading-tight">Other Apps</span>
-                </button>
-              </div>
-
-              <div className="mt-10 p-4 bg-primary/10 rounded-2xl border border-primary/20">
-                <p className="text-[10px] text-primary font-bold text-center leading-relaxed">
-                  Amount: ₹{parseFloat(paymentAmount || '0').toLocaleString()} will be automatically filled in the selected app.
-                </p>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       <BottomSheet 
         isOpen={showAddUPIModal} 
