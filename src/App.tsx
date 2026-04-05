@@ -875,12 +875,13 @@ const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClos
 };
 
 const UPI_APPS = [
-  { name: 'Google Pay', package: 'com.google.android.apps.nbu.paisa.user', icon: 'https://img.icons8.com/?size=48&id=68067&format=png' },
-  { name: 'PhonePe', package: 'com.phonepe.app', icon: 'https://img.icons8.com/?size=48&id=am4ltuIYDpQ5&format=png' },
-  { name: 'Paytm', package: 'net.one97.paytm', icon: 'https://img.icons8.com/?size=48&id=OYtBxIlJwMGA&format=png' },
+  { name: 'PhonePe', package: 'com.phonepe.app', icon: 'https://img.icons8.com/?size=48&id=OYtBxIlJwMGA&format=png' },
+  { name: 'Paytm', package: 'net.one97.paytm', icon: 'https://img.icons8.com/?size=48&id=68067&format=png' },
+  { name: 'Google Pay', package: 'com.google.android.apps.nbu.paisa.user', icon: 'https://img.icons8.com/?size=48&id=am4ltuIYDpQ5&format=png' },
+  { name: 'FamPay', package: 'com.fampay.app', icon: 'https://play-lh.googleusercontent.com/0IkegIm8uvzIM3RiVBfj01eSlNa3r5C_GCuExyI57b9_x-qLeV8YR3SVuT8DPPYT_N0=w240-h480-rw' },
+  { name: 'Amazon Pay', package: 'in.amazon.mShop.android.shopping', icon: 'https://play-lh.googleusercontent.com/urVIq3KHpF9hAm7FJpE2I4YlGfqMFpUdb5GMtQcASC1ODbWe1zuQFrF99ZPTELfE8wA=w240-h480-rw' },
+  { name: 'BHIM', package: 'in.org.npci.upiapp', icon: 'https://play-lh.googleusercontent.com/B5cNBA15IxjCT-8UTXEWgiPcGkJ1C07iHKwm2Hbs8xR3PnJvZ0swTag3abdC_Fj5OfnP=w240-h480-rw' },
   { name: 'Kiwi', package: 'com.go.kiwi', icon: 'https://gokiwi.in/logo.png' },
-  { name: 'Amazon Pay', package: 'in.amazon.mShop.android.shopping', icon: 'https://m.media-amazon.com/images/G/31/AmazonPay/Logo/AmazonPay_Logo_White._CB485933534_.png' },
-  { name: 'BHIM', package: 'in.org.npci.upiapp', icon: 'https://www.bhimupi.org.in/assets/images/bhim-logo.png' },
 ];
 
 const UPIPaymentModal = ({ 
@@ -1300,10 +1301,13 @@ export default function App() {
     // Directly trigger native UPI chooser or specific app after a short delay
     setTimeout(() => {
       if (scannedUPI) {
-        const baseUrl = `upi://pay?pa=${scannedUPI.upiId}&pn=${encodeURIComponent(scannedUPI.name || 'Merchant')}&am=${amount}&cu=INR`;
-        const link = appPackage 
-          ? `intent://pay?pa=${scannedUPI.upiId}&pn=${encodeURIComponent(scannedUPI.name || 'Merchant')}&am=${amount}&cu=INR#Intent;scheme=upi;package=${appPackage};end`
-          : baseUrl;
+        const upiUrl = `upi://pay?pa=${scannedUPI.upiId}&pn=${encodeURIComponent(scannedUPI.name || 'Merchant')}&am=${amount}&cu=INR&tn=${encodeURIComponent('Payment via Obsidian')}`;
+        
+        let link = upiUrl;
+        if (appPackage) {
+          // Use Android Intent for specific app targeting
+          link = `intent://pay?pa=${scannedUPI.upiId}&pn=${encodeURIComponent(scannedUPI.name || 'Merchant')}&am=${amount}&cu=INR&tn=${encodeURIComponent('Payment via Obsidian')}#Intent;scheme=upi;package=${appPackage};end`;
+        }
           
         window.location.href = link;
         
@@ -1357,7 +1361,7 @@ export default function App() {
   const [newTx, setNewTx] = useState({ 
     amount: '', 
     merchant: '', 
-    category: 'Dining', 
+    category: 'Shopping', 
     type: 'expense', 
     cardId: '',
     isUPIApp: false,
@@ -2533,6 +2537,44 @@ export default function App() {
             />
           </div>
           
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">Type</label>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setNewTx({...newTx, type: 'expense'})}
+                  className={cn(
+                    "flex-1 py-3 rounded-xl text-xs font-bold transition-all border",
+                    newTx.type === 'expense' ? "bg-error/10 border-error text-error" : "bg-surface-container border-transparent text-on-surface-variant"
+                  )}
+                >
+                  SPENT
+                </button>
+                <button 
+                  onClick={() => setNewTx({...newTx, type: 'income'})}
+                  className={cn(
+                    "flex-1 py-3 rounded-xl text-xs font-bold transition-all border",
+                    newTx.type === 'income' ? "bg-secondary/10 border-secondary text-secondary" : "bg-surface-container border-transparent text-on-surface-variant"
+                  )}
+                >
+                  RECEIVED
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">Category</label>
+              <select 
+                value={newTx.category}
+                onChange={e => setNewTx({...newTx, category: e.target.value})}
+                className="w-full bg-surface-container rounded-xl p-3 text-sm focus:outline-none border border-white/5 appearance-none"
+              >
+                {Object.keys(CATEGORY_ICONS).map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div className="flex items-center gap-2 mb-2">
             <input 
               type="checkbox" 
@@ -2548,13 +2590,17 @@ export default function App() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">App Name</label>
-                <input 
-                  type="text" 
+                <select 
                   value={newTx.upiAppName}
                   onChange={e => setNewTx({...newTx, upiAppName: e.target.value})}
-                  placeholder="e.g. Paytm" 
-                  className="w-full bg-surface-container rounded-xl p-4 text-sm focus:outline-none border border-white/5" 
-                />
+                  className="w-full bg-surface-container rounded-xl p-4 text-sm focus:outline-none border border-white/5 appearance-none"
+                >
+                  <option value="">Select App</option>
+                  {UPI_APPS.map(app => (
+                    <option key={app.name} value={app.name}>{app.name}</option>
+                  ))}
+                  <option value="Other">Other</option>
+                </select>
               </div>
               <div>
                 <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">Bank Card/ID</label>
@@ -2568,7 +2614,7 @@ export default function App() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">Account/Card</label>
                 <select 
@@ -2579,17 +2625,6 @@ export default function App() {
                   {displayCards.filter(c => c.type !== 'app').map(c => (
                     <option key={c.id} value={c.id}>{c.name} ({c.last4})</option>
                   ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">Type</label>
-                <select 
-                  value={newTx.type}
-                  onChange={e => setNewTx({...newTx, type: e.target.value as any})}
-                  className="w-full bg-surface-container rounded-xl p-4 text-sm focus:outline-none border border-white/5 appearance-none"
-                >
-                  <option value="expense">Expense</option>
-                  <option value="income">Income</option>
                 </select>
               </div>
             </div>
