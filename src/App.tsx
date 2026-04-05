@@ -71,7 +71,7 @@ import {
 import { cn } from './lib/utils';
 import { Transaction, Card, Budget, UserProfile, Notification, BANK_LOGOS, CARD_COLORS, SavingsGoal, UPIAccount, Bank } from './types';
 import { GoogleGenAI } from "@google/genai";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import { Html5Qrcode } from "html5-qrcode";
 
 // --- Constants & Mock Data ---
 const INITIAL_CARDS: Card[] = [];
@@ -553,7 +553,8 @@ const SwipeableItem = ({ children, onDelete, onEdit, className }: { children: Re
 };
 
 // --- Helpers ---
-const formatCurrency = (amount: number, currency: string) => {
+const formatCurrency = (amount: number | undefined, currency: string) => {
+  if (amount === undefined || amount === null) return '₹0.00';
   const symbol = currency === 'INR' ? '₹' : '$';
   return `${symbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
@@ -766,26 +767,42 @@ const BottomNavBar = ({ activeTab, onTabChange }: { activeTab: string, onTabChan
 // --- UPI Components ---
 
 const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClose: () => void }) => {
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    scannerRef.current = new Html5QrcodeScanner(
-      "reader",
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      /* verbose= */ false
-    );
-    scannerRef.current.render(
-      (decodedText) => {
-        onScan(decodedText);
-        scannerRef.current?.clear();
-      },
-      (error) => {
-        // console.warn(error);
+    const html5QrCode = new Html5Qrcode("reader");
+    scannerRef.current = html5QrCode;
+
+    const startScanner = async () => {
+      try {
+        const devices = await Html5Qrcode.getCameras();
+        if (devices && devices.length > 0) {
+          const cameraId = devices[0].id; // Use the first camera
+          await html5QrCode.start(
+            cameraId,
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            (decodedText) => {
+              onScan(decodedText);
+              html5QrCode.stop().catch(console.error);
+            },
+            (errorMessage) => {
+              // console.warn(errorMessage);
+            }
+          );
+          setIsReady(true);
+        }
+      } catch (err) {
+        console.error("Error starting scanner:", err);
       }
-    );
+    };
+
+    startScanner();
 
     return () => {
-      scannerRef.current?.clear();
+      if (scannerRef.current?.isScanning) {
+        scannerRef.current.stop().catch(console.error);
+      }
     };
   }, [onScan]);
 
@@ -797,11 +814,30 @@ const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClos
           <X size={20} />
         </button>
       </div>
-      <div id="reader" className="w-full max-w-sm rounded-3xl overflow-hidden border-2 border-primary/50" />
+      <div className="relative w-full max-w-sm aspect-square rounded-3xl overflow-hidden border-2 border-primary/50 bg-surface-container">
+        {!isReady && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <motion.div 
+              animate={{ rotate: 360 }} 
+              transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+              className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
+            />
+          </div>
+        )}
+        <div id="reader" className="w-full h-full" />
+      </div>
       <p className="text-white/60 text-center mt-8 text-sm">Align the QR code within the frame to scan</p>
     </div>
   );
 };
+
+const UPI_APPS = [
+  { id: 'gpay', name: 'Google Pay', package: 'com.google.android.apps.nbu.paisa.user', logo: 'https://upload.wikimedia.org/wikipedia/commons/f/f2/Google_Pay_Logo.svg' },
+  { id: 'phonepe', name: 'PhonePe', package: 'com.phonepe.app', logo: 'https://upload.wikimedia.org/wikipedia/commons/7/71/PhonePe_Logo.svg' },
+  { id: 'paytm', name: 'Paytm', package: 'net.one97.paytm', logo: 'https://upload.wikimedia.org/wikipedia/commons/2/24/Paytm_Logo_%28standalone%29.svg' },
+  { id: 'amazonpay', name: 'Amazon Pay', package: 'in.amazon.mShop.android.shopping', logo: 'https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg' },
+  { id: 'bhim', name: 'BHIM', package: 'in.org.npci.upiapp', logo: 'https://upload.wikimedia.org/wikipedia/commons/e/e1/BHIM_Logo.png' },
+];
 
 const UPIPaymentModal = ({ 
   upiData, 
@@ -819,14 +855,33 @@ const UPIPaymentModal = ({
   const [amount, setAmount] = useState(upiData.amount || '');
   const [selectedAccountId, setSelectedAccountId] = useState(accounts.find(a => a.isDefault)?.id || accounts[0]?.id);
   const [isPaying, setIsPaying] = useState(false);
+  const [showAppChooser, setShowAppChooser] = useState(false);
+
+  const generateUPILink = (appPackage?: string) => {
+    const baseUrl = `upi://pay?pa=${upiData.upiId}&pn=${encodeURIComponent(upiData.name || 'Merchant')}&am=${amount}&cu=INR`;
+    if (appPackage) {
+      // Android intent to target specific app
+      return `intent://pay?pa=${upiData.upiId}&pn=${encodeURIComponent(upiData.name || 'Merchant')}&am=${amount}&cu=INR#Intent;scheme=upi;package=${appPackage};end`;
+    }
+    return baseUrl;
+  };
 
   const handlePay = () => {
     if (!amount || !selectedAccountId) return;
+    setShowAppChooser(true);
+  };
+
+  const executePayment = (appPackage?: string) => {
+    const link = generateUPILink(appPackage);
+    window.location.href = link;
+    
+    // Simulate recording the transaction in our app after a delay
     setIsPaying(true);
     setTimeout(() => {
       onPay(parseFloat(amount), selectedAccountId);
       setIsPaying(false);
-    }, 1500);
+      onClose();
+    }, 2000);
   };
 
   return (
@@ -896,10 +951,62 @@ const UPIPaymentModal = ({
         ) : (
           <>
             <Zap size={20} />
-            Pay Now
+            Continue to Payment
           </>
         )}
       </button>
+
+      <AnimatePresence>
+        {showAppChooser && (
+          <div className="fixed inset-0 z-[200] flex items-end justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setShowAppChooser(false)}
+            />
+            <motion.div 
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={SMOOTH_TRANSITION}
+              className="relative w-full max-w-md bg-surface-container-high rounded-t-[32px] p-8 pb-12 shadow-2xl border-t border-white/10"
+            >
+              <div className="flex justify-between items-center mb-8">
+                <h3 className="font-headline text-2xl font-bold">Choose UPI App</h3>
+                <button onClick={() => setShowAppChooser(false)} className="text-on-surface-variant"><X size={24} /></button>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-6">
+                {UPI_APPS.map(app => (
+                  <button 
+                    key={app.id}
+                    onClick={() => executePayment(app.package)}
+                    className="flex flex-col items-center gap-3 active:scale-90 transition-transform"
+                  >
+                    <div className="w-16 h-16 bg-white rounded-2xl p-3 flex items-center justify-center shadow-lg border border-white/5">
+                      <img src={app.logo} alt={app.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                    </div>
+                    <span className="text-[10px] font-bold text-center leading-tight">{app.name}</span>
+                  </button>
+                ))}
+                <button 
+                  onClick={() => executePayment()}
+                  className="flex flex-col items-center gap-3 active:scale-90 transition-transform"
+                >
+                  <div className="w-16 h-16 bg-surface-container rounded-2xl flex items-center justify-center shadow-lg border border-white/5">
+                    <LayoutGrid size={24} className="text-primary" />
+                  </div>
+                  <span className="text-[10px] font-bold text-center leading-tight">Other Apps</span>
+                </button>
+              </div>
+
+              <div className="mt-10 p-4 bg-primary/10 rounded-2xl border border-primary/20">
+                <p className="text-[10px] text-primary font-bold text-center leading-relaxed">
+                  Amount: ₹{parseFloat(amount).toLocaleString()} will be automatically filled in the selected app.
+                </p>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -935,7 +1042,7 @@ const UPIManagement = ({ accounts, transactions, onAdd, onDelete, onSetDefault, 
             <div className="flex justify-between items-end">
               <div>
                 <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-1">Balance</p>
-                <p className="text-xl font-bold">₹{acc.balance.toLocaleString()}</p>
+                <p className="text-xl font-bold">₹{(acc.balance || 0).toLocaleString()}</p>
               </div>
               <div className="flex gap-2">
                 {!acc.isDefault && (
@@ -1657,14 +1764,14 @@ export default function App() {
                       <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                         <Target size={20} />
                       </div>
-                      <span className="text-[10px] font-bold text-primary uppercase tracking-widest">{Math.round((goal.current / goal.target) * 100)}%</span>
+                      <span className="text-[10px] font-bold text-primary uppercase tracking-widest">{Math.round(((goal.currentAmount || 0) / (goal.targetAmount || 1)) * 100)}%</span>
                     </div>
                     <h3 className="font-headline font-bold mb-1">{goal.name}</h3>
-                    <p className="text-xl font-bold mb-4">₹{goal.current.toLocaleString()} <span className="text-xs text-on-surface-variant font-normal">/ ₹{goal.target.toLocaleString()}</span></p>
+                    <p className="text-xl font-bold mb-4">₹{(goal.currentAmount || 0).toLocaleString()} <span className="text-xs text-on-surface-variant font-normal">/ ₹{(goal.targetAmount || 0).toLocaleString()}</span></p>
                     <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                       <motion.div 
                         initial={{ width: 0 }}
-                        animate={{ width: `${(goal.current / goal.target) * 100}%` }}
+                        animate={{ width: `${((goal.currentAmount || 0) / (goal.targetAmount || 1)) * 100}%` }}
                         transition={SMOOTH_TRANSITION}
                         className="h-full bg-primary"
                       />
