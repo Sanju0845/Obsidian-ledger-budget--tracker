@@ -7,6 +7,7 @@ export interface Transaction {
   date: string;
   cardId: string;
   description?: string;
+  upiApp?: string;
 }
 
 export interface Card {
@@ -17,6 +18,8 @@ export interface Card {
   balance: number;
   color: string;
   expiry: string;
+  type?: 'upi' | 'app' | 'credit' | 'debit';
+  icon?: string;
 }
 
 export interface Budget {

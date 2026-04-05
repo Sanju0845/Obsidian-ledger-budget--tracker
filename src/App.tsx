@@ -563,7 +563,11 @@ const CardStack = React.memo(({ cards, activeIndex, onSwipe, currency }: { cards
               >
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-3">
-                    {BANK_LOGOS[card.bank.toLowerCase().replace(/\s/g, '')] ? (
+                    {card.type === 'app' ? (
+                      <div className="bg-white p-1 rounded-md h-8 w-8 flex items-center justify-center overflow-hidden">
+                        <img src={card.icon} className="h-full w-full object-contain" alt={card.name} referrerPolicy="no-referrer" />
+                      </div>
+                    ) : BANK_LOGOS[card.bank.toLowerCase().replace(/\s/g, '')] ? (
                       <div className="bg-white/90 p-1 rounded-md h-8 w-8 flex items-center justify-center overflow-hidden">
                         <img 
                           src={BANK_LOGOS[card.bank.toLowerCase().replace(/\s/g, '')]} 
@@ -583,20 +587,20 @@ const CardStack = React.memo(({ cards, activeIndex, onSwipe, currency }: { cards
                     )}
                     <span className="text-white/60 text-xs font-medium">| {card.name}</span>
                   </div>
-                  <CreditCard className="text-white/80" size={24} />
+                  {card.type === 'app' ? <Smartphone className="text-white/80" size={24} /> : <CreditCard className="text-white/80" size={24} />}
                 </div>
                 
                 <div>
                   <p className="font-headline text-2xl text-white tracking-[0.2em] mb-4">
-                    •••• •••• •••• {card.last4}
+                    {card.type === 'app' ? 'UPI APP CARD' : `•••• •••• •••• ${card.last4}`}
                   </p>
                   <div className="flex justify-between items-end">
                     <div>
-                      <p className="text-[10px] uppercase font-label text-white/60 mb-1">Balance</p>
+                      <p className="text-[10px] uppercase font-label text-white/60 mb-1">{card.type === 'app' ? 'Total Spent' : 'Balance'}</p>
                       <p className="font-headline text-xl text-white font-bold">{formatCurrency(card.balance, currency)}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] uppercase font-label text-white/60">Exp {card.expiry}</p>
+                      <p className="text-[10px] uppercase font-label text-white/60">{card.type === 'app' ? 'ACTIVE' : `Exp ${card.expiry}`}</p>
                     </div>
                   </div>
                 </div>
@@ -610,19 +614,28 @@ const CardStack = React.memo(({ cards, activeIndex, onSwipe, currency }: { cards
 });
 
 const TransactionItem = ({ transaction, onDelete, currency }: { transaction: Transaction, onDelete?: (id: string) => void, currency: string, key?: React.Key }) => {
+  const upiApp = transaction.upiApp ? UPI_APPS.find(a => a.package === transaction.upiApp) : null;
   const Icon = CATEGORY_ICONS[transaction.category] || ReceiptText;
   const isExpense = transaction.type === 'expense';
 
   const content = (
     <div className="bg-surface-container-low hover:bg-surface-container p-4 flex items-center transition-colors group relative overflow-hidden">
       <div className={cn(
-        "w-12 h-12 rounded-lg flex items-center justify-center",
+        "w-12 h-12 rounded-lg flex items-center justify-center relative",
         isExpense ? "bg-error/10 text-error" : "bg-secondary/10 text-secondary"
       )}>
         <Icon size={24} />
+        {upiApp && (
+          <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-white rounded-full p-1 border border-white/10 shadow-sm overflow-hidden">
+            <img src={upiApp.icon} alt={upiApp.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+          </div>
+        )}
       </div>
       <div className="ml-4 flex-1">
-        <p className="text-sm font-bold text-on-surface tracking-tight">{transaction.merchant}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-bold text-on-surface tracking-tight">{transaction.merchant}</p>
+          {upiApp && <span className="text-[8px] font-bold text-primary px-1.5 py-0.5 bg-primary/10 rounded-full uppercase tracking-tighter">{upiApp.name}</span>}
+        </div>
         <p className="text-[11px] text-on-surface-variant font-medium">{transaction.category}</p>
       </div>
       <div className="text-right flex items-center gap-3">
@@ -1294,7 +1307,7 @@ export default function App() {
         window.location.href = link;
         
         // Record the transaction
-        handleUPIPay(parseFloat(amount), accountId);
+        handleUPIPay(parseFloat(amount), accountId, appPackage);
         setScannedUPI(null);
       }
     }, 300);
@@ -1307,6 +1320,16 @@ export default function App() {
   const [isParsing, setIsParsing] = useState(false);
   const [smsSyncEnabled, setSmsSyncEnabled] = useState(() => {
     return localStorage.getItem('obsidian_sms_sync') === 'true';
+  });
+
+  const [usedUPIApps, setUsedUPIApps] = useState<string[]>(() => {
+    const saved = localStorage.getItem('obsidian_used_upi_apps');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [latestScannedUPI, setLatestScannedUPI] = useState<{ upiId: string, name?: string } | null>(() => {
+    const saved = localStorage.getItem('obsidian_latest_scanned_upi');
+    return saved ? JSON.parse(saved) : null;
   });
 
   // Profile & Notifications state
@@ -1340,6 +1363,14 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('obsidian_transactions', JSON.stringify(transactions));
   }, [transactions]);
+
+  useEffect(() => {
+    localStorage.setItem('obsidian_used_upi_apps', JSON.stringify(usedUPIApps));
+  }, [usedUPIApps]);
+
+  useEffect(() => {
+    localStorage.setItem('obsidian_latest_scanned_upi', JSON.stringify(latestScannedUPI));
+  }, [latestScannedUPI]);
 
   useEffect(() => {
     localStorage.setItem('obsidian_budgets', JSON.stringify(budgets));
@@ -1385,6 +1416,15 @@ export default function App() {
   // Back button handling
   useEffect(() => {
     const handlePopState = (e: PopStateEvent) => {
+      if (showQRScanner) {
+        setShowQRScanner(false);
+        return;
+      }
+      if (showUPIPaymentModal) {
+        setShowUPIPaymentModal(false);
+        setScannedUPI(null);
+        return;
+      }
       if (e.state && e.state.tab) {
         setActiveTab(e.state.tab);
       } else {
@@ -1393,11 +1433,12 @@ export default function App() {
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [showQRScanner, showUPIPaymentModal]);
 
   const handleTabChange = (tab: string) => {
     if (tab === 'scan') {
       setShowQRScanner(true);
+      window.history.pushState({ scanner: true }, '', '#scan');
       return;
     }
     setActiveTab(tab);
@@ -1434,45 +1475,54 @@ export default function App() {
   const handleQRScan = useCallback((data: string) => {
     // UPI QR format: upi://pay?pa=address&pn=name&am=amount&cu=currency&tn=note
     try {
-      const url = new URL(data);
-      if (url.protocol === 'upi:') {
+      if (data.startsWith('upi://pay')) {
+        const url = new URL(data);
         const params = new URLSearchParams(url.search);
         const upiId = params.get('pa') || '';
         const name = params.get('pn') || '';
         const amount = params.get('am') || '';
         
         if (upiId) {
+          setLatestScannedUPI({ upiId, name });
           setScannedUPI({ upiId, name, amount });
           setShowQRScanner(false);
           setShowUPIPaymentModal(true);
         }
       } else {
         // Handle generic text or other formats
+        setLatestScannedUPI({ upiId: data });
         setScannedUPI({ upiId: data });
         setShowQRScanner(false);
         setShowUPIPaymentModal(true);
       }
     } catch (e) {
       // Fallback for non-URL QR codes
+      setLatestScannedUPI({ upiId: data });
       setScannedUPI({ upiId: data });
       setShowQRScanner(false);
       setShowUPIPaymentModal(true);
     }
   }, []);
 
-  const handleUPIPay = (amount: number, accountId: string) => {
-    const account = upiAccounts.find(a => a.id === accountId);
-    if (!account || account.balance < amount) {
-      // Handle error
-      return;
+  const handleUPIPay = (amount: number, accountId: string, appPackage?: string) => {
+    // If appPackage is provided, it's an external app payment
+    if (appPackage) {
+      if (!usedUPIApps.includes(appPackage)) {
+        setUsedUPIApps(prev => [...prev, appPackage]);
+      }
     }
 
-    // Deduct from UPI account
-    setUpiAccounts(prev => prev.map(a => 
-      a.id === accountId ? { ...a, balance: a.balance - amount } : a
-    ));
+    const account = upiAccounts.find(a => a.id === accountId);
+    
+    // If account exists, deduct balance.
+    if (account) {
+      setUpiAccounts(prev => prev.map(a => 
+        a.id === accountId ? { ...a, balance: a.balance - amount } : a
+      ));
+    }
 
     // Add transaction
+    const appInfo = UPI_APPS.find(a => a.package === appPackage);
     const newTransaction: Transaction = {
       id: Math.random().toString(36).substr(2, 9),
       amount,
@@ -1480,8 +1530,9 @@ export default function App() {
       category: 'UPI Payment',
       merchant: scannedUPI?.name || scannedUPI?.upiId || 'UPI Transfer',
       date: new Date().toISOString(),
-      cardId: 'upi', // Special ID for UPI transactions
-      description: `UPI Payment to ${scannedUPI?.upiId}`
+      cardId: appPackage || accountId || 'upi', 
+      description: `UPI Payment via ${appInfo?.name || 'UPI App'} to ${scannedUPI?.upiId}`,
+      upiApp: appPackage
     };
     setTransactions(prev => [newTransaction, ...prev]);
 
@@ -1777,6 +1828,39 @@ export default function App() {
     }
   };
 
+  const displayCards = useMemo(() => {
+    const bankCards = upiAccounts.map((acc, idx) => ({
+      id: acc.id,
+      name: acc.upiId,
+      bank: acc.bankName,
+      last4: acc.accountNumber.slice(-4),
+      balance: acc.balance,
+      color: CARD_COLORS[idx % CARD_COLORS.length],
+      expiry: 'UPI',
+      type: 'upi' as const
+    }));
+
+    const appCards = usedUPIApps.map((pkg, idx) => {
+      const app = UPI_APPS.find(a => a.package === pkg);
+      const appTransactions = transactions.filter(t => t.upiApp === pkg);
+      const totalSpent = appTransactions.reduce((sum, t) => sum + t.amount, 0);
+      
+      return {
+        id: pkg,
+        name: app?.name || 'UPI App',
+        bank: 'UPI App',
+        last4: 'APP',
+        balance: totalSpent,
+        color: CARD_COLORS[(bankCards.length + idx) % CARD_COLORS.length],
+        expiry: 'APP',
+        type: 'app' as const,
+        icon: app?.icon
+      };
+    });
+
+    return [...bankCards, ...appCards];
+  }, [upiAccounts, usedUPIApps, transactions]);
+
   return (
     <div className="min-h-screen bg-surface text-on-surface font-sans selection:bg-primary selection:text-surface overflow-x-hidden">
       <AnimatePresence>
@@ -1814,15 +1898,15 @@ export default function App() {
               </div>
             </section>
 
-            {cards.length > 0 ? (
-              <CardStack cards={cards} activeIndex={activeCardIndex} onSwipe={handleSwipe} currency={profile.currency} />
+            {displayCards.length > 0 ? (
+              <CardStack cards={displayCards} activeIndex={activeCardIndex} onSwipe={handleSwipe} currency={profile.currency} />
             ) : (
               <div 
-                onClick={() => setShowAddCardModal(true)}
+                onClick={() => handleTabChange('upi')}
                 className="h-52 mb-12 rounded-2xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-3 text-on-surface-variant hover:text-white hover:border-white/20 transition-all cursor-pointer"
               >
                 <Plus size={32} />
-                <p className="font-headline text-lg font-bold">Add your first card</p>
+                <p className="font-headline text-lg font-bold">Link your first account</p>
               </div>
             )}
 
@@ -1863,6 +1947,22 @@ export default function App() {
                 <span className="text-primary text-sm font-bold cursor-pointer">View All</span>
               </div>
               <div className="flex gap-6 overflow-x-auto no-scrollbar pb-2">
+                {latestScannedUPI && (
+                  <button 
+                    onClick={() => {
+                      setScannedUPI({ upiId: latestScannedUPI.upiId, name: latestScannedUPI.name });
+                      setShowUPIPaymentModal(true);
+                    }}
+                    className="flex flex-col items-center gap-3 active:scale-90 transition-transform min-w-[70px]"
+                  >
+                    <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-primary to-tertiary">
+                      <div className="w-full h-full rounded-full border-2 border-surface overflow-hidden flex items-center justify-center bg-surface-container">
+                        <Scan size={24} className="text-primary" />
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-primary truncate w-16 text-center">Latest</span>
+                  </button>
+                )}
                 {[
                   { name: 'Aman', upi: 'aman@paytm', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aman' },
                   { name: 'Priya', upi: 'priya@okaxis', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Priya' },
