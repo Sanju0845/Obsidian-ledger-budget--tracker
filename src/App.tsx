@@ -563,7 +563,7 @@ const formatCurrency = (amount: number | undefined, currency: string) => {
 // --- Components ---
 
 const TopAppBar = ({ profile, onProfileClick, onNotificationsClick, unreadCount }: { profile: UserProfile, onProfileClick: () => void, onNotificationsClick: () => void, unreadCount: number }) => (
-  <header className="fixed top-4 left-0 right-0 w-full flex justify-between px-6 z-50">
+  <header className="fixed top-4 left-0 right-0 w-full flex justify-between px-6 z-50 will-change-transform">
     <div 
       onClick={onProfileClick}
       className="glass-header rounded-full h-12 px-2 flex items-center shadow-[0px_0px_32px_rgba(186,158,255,0.08)] cursor-pointer active:scale-95 transition-transform"
@@ -576,7 +576,7 @@ const TopAppBar = ({ profile, onProfileClick, onNotificationsClick, unreadCount 
           referrerPolicy="no-referrer"
         />
       </div>
-      <span className="ml-3 mr-4 font-headline font-bold text-white text-sm tracking-tight">{profile.name} v1.6.</span>
+      <span className="ml-3 mr-4 font-headline font-bold text-white text-sm tracking-tight">{profile.name} v1.7.</span>
     </div>
     <div className="flex gap-2">
       <button 
@@ -598,11 +598,8 @@ const CardStack = React.memo(({ cards, activeIndex, onSwipe, currency }: { cards
       <div className="relative h-full w-full max-w-md mx-auto flex items-center justify-center">
         <AnimatePresence initial={false}>
           {cards.map((card, idx) => {
-            // Calculate relative index for stacking effect
             let relIdx = (idx - activeIndex + cards.length) % cards.length;
-            
-            // We only show the active card and the next 2 cards in the stack
-            if (relIdx > 2) return null;
+            if (relIdx > 1) return null; // Only show top 2 cards for performance
 
             return (
               <motion.div
@@ -613,21 +610,21 @@ const CardStack = React.memo(({ cards, activeIndex, onSwipe, currency }: { cards
                   "bg-gradient-to-br",
                   card.color
                 )}
-                initial={{ scale: 0.8, opacity: 0, y: 20 }}
+                initial={false}
                 animate={{ 
-                  scale: 1 - relIdx * 0.08, 
-                  opacity: 1 - relIdx * 0.4,
-                  y: relIdx * -25, // More pronounced stack
+                  scale: 1 - relIdx * 0.05, 
+                  opacity: 1 - relIdx * 0.5,
+                  y: relIdx * -15,
                   zIndex: cards.length - relIdx,
-                  rotate: relIdx * 2
+                  rotate: relIdx * 1
                 }}
-                transition={SMOOTH_TRANSITION}
-                exit={{ x: -300, opacity: 0, rotate: -20, transition: { duration: 0.2 } }}
+                transition={{ duration: 0.3 }}
+                exit={{ x: -200, opacity: 0, transition: { duration: 0.2 } }}
                 drag={relIdx === 0 ? "x" : false}
                 dragConstraints={{ left: 0, right: 0 }}
                 onDragEnd={(_, info) => {
-                  if (info.offset.x > 100) onSwipe(-1);
-                  else if (info.offset.x < -100) onSwipe(1);
+                  if (info.offset.x > 80) onSwipe(-1);
+                  else if (info.offset.x < -80) onSwipe(1);
                 }}
                 style={{ cursor: relIdx === 0 ? 'grab' : 'default' }}
               >
@@ -729,7 +726,7 @@ const BottomNavBar = ({ activeTab, onTabChange }: { activeTab: string, onTabChan
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 w-full z-50 pointer-events-none">
+    <nav className="fixed bottom-0 left-0 w-full z-50 pointer-events-none will-change-transform">
       {/* Fade background to prevent accidental clicks and add depth */}
       <div className="absolute inset-x-0 bottom-0 h-32 glass-nav pointer-events-auto" />
       
@@ -1265,6 +1262,7 @@ export default function App() {
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [activeTab, setActiveTab] = useState('home');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showManageCardsModal, setShowManageCardsModal] = useState(false);
   const [showAddCardModal, setShowAddCardModal] = useState(false);
   const [showSmsModal, setShowSmsModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -1280,9 +1278,18 @@ export default function App() {
   const handleUPIContinue = (amount: string, accountId: string) => {
     setPaymentAmount(amount);
     setSelectedUPIAccount(accountId);
-    setShowUPIPaymentModal(false); // Close the payment modal first
+    setShowUPIPaymentModal(false); 
+    
+    // Directly trigger native UPI chooser after a short delay to ensure modal is closed
     setTimeout(() => {
-      setShowUPIAppChooser(true);
+      if (scannedUPI) {
+        const baseUrl = `upi://pay?pa=${scannedUPI.upiId}&pn=${encodeURIComponent(scannedUPI.name || 'Merchant')}&am=${amount}&cu=INR`;
+        window.location.href = baseUrl;
+        
+        // Record the transaction
+        handleUPIPay(parseFloat(amount), accountId);
+        setScannedUPI(null);
+      }
     }, 300);
   };
 
@@ -1799,7 +1806,7 @@ export default function App() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-10">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-10">
               <button 
                 onClick={() => setShowQRScanner(true)}
                 className="glass-header rounded-xl py-4 flex flex-col items-center justify-center gap-2 hover:bg-surface-container transition-colors border-primary/20 border"
@@ -1822,18 +1829,11 @@ export default function App() {
                 <span className="font-label text-[10px] font-bold text-on-surface uppercase tracking-wider">Add Tx</span>
               </button>
               <button 
-                onClick={() => setShowSplitModal(true)}
+                onClick={() => setShowManageCardsModal(true)}
                 className="glass-header rounded-xl py-4 flex flex-col items-center justify-center gap-2 hover:bg-surface-container transition-colors"
               >
-                <Users className="text-primary" size={20} />
-                <span className="font-label text-[10px] font-bold text-on-surface uppercase tracking-wider">Split Bill</span>
-              </button>
-              <button 
-                onClick={() => setShowRequestModal(true)}
-                className="glass-header rounded-xl py-4 flex flex-col items-center justify-center gap-2 hover:bg-surface-container transition-colors"
-              >
-                <HandCoins className="text-error" size={20} />
-                <span className="font-label text-[10px] font-bold text-on-surface uppercase tracking-wider">Request</span>
+                <CreditCard className="text-secondary" size={20} />
+                <span className="font-label text-[10px] font-bold text-on-surface uppercase tracking-wider">Manage Cards</span>
               </button>
             </div>
 
@@ -1898,7 +1898,7 @@ export default function App() {
               </div>
               <div className="space-y-2">
                 {filteredTransactions.length > 0 ? (
-                  filteredTransactions.map(tx => (
+                  filteredTransactions.slice(0, 5).map(tx => (
                     <TransactionItem 
                       key={tx.id} 
                       transaction={tx} 
@@ -1910,14 +1910,6 @@ export default function App() {
                   <div className="text-center py-10 text-on-surface-variant text-sm">No transactions for this card</div>
                 )}
               </div>
-              {activeCard && (
-                <button 
-                  onClick={() => handleDeleteCard(activeCard.id)}
-                  className="w-full mt-8 py-4 text-error/60 hover:text-error text-[10px] font-bold uppercase tracking-widest transition-colors"
-                >
-                  Delete Current Card
-                </button>
-              )}
             </section>
           </motion.div>
         )}
@@ -2506,6 +2498,66 @@ export default function App() {
       >
         <RequestMoneyModal onClose={() => setShowRequestModal(false)} />
       </BottomSheet>
+
+      {/* Manage Cards Modal */}
+      <AnimatePresence>
+        {showManageCardsModal && (
+          <div className="fixed inset-0 z-[100] flex items-end justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setShowManageCardsModal(false)}
+            />
+            <motion.div 
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={SMOOTH_TRANSITION}
+              className="relative w-full max-w-md bg-surface-container-high rounded-t-3xl p-8 pb-12 shadow-2xl border-t border-white/10 max-h-[80vh] overflow-y-auto no-scrollbar"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="font-headline text-2xl font-bold">Manage Cards</h3>
+                <button onClick={() => setShowManageCardsModal(false)} className="text-on-surface-variant"><X size={24} /></button>
+              </div>
+              
+              <div className="space-y-4 mb-8">
+                {cards.map(card => (
+                  <div key={card.id} className={cn("p-4 rounded-2xl border border-white/5 flex items-center justify-between bg-gradient-to-r", card.color)}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                        <CreditCard size={20} className="text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-white">{card.bank}</p>
+                        <p className="text-[10px] text-white/60">•••• {card.last4}</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        if (confirm(`Delete ${card.bank} card?`)) {
+                          setCards(cards.filter(c => c.id !== card.id));
+                        }
+                      }}
+                      className="w-10 h-10 rounded-full bg-error/20 flex items-center justify-center text-error"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <button 
+                onClick={() => {
+                  setShowManageCardsModal(false);
+                  setShowAddCardModal(true);
+                }}
+                className="w-full bg-primary/10 text-primary font-bold py-4 rounded-xl border border-primary/20 flex items-center justify-center gap-2"
+              >
+                <Plus size={20} />
+                Add New Card
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Add Card Modal */}
       <AnimatePresence>
