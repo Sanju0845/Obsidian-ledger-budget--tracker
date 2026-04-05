@@ -123,8 +123,8 @@ const CATEGORY_ICONS: Record<string, any> = {
 
 // --- Animation Constants ---
 const SMOOTH_TRANSITION = { type: 'tween' as const, ease: 'easeInOut' as const, duration: 0.3 };
-const QUICK_TRANSITION = { type: 'tween' as const, ease: 'linear' as const, duration: 0.15 };
-const NO_DAMPING_TRANSITION = { type: 'tween' as const, ease: 'easeOut' as const, duration: 0.2 };
+const QUICK_TRANSITION = { type: 'tween' as const, ease: 'linear' as const, duration: 0.1 };
+const NO_DAMPING_TRANSITION = { type: 'tween' as const, ease: 'easeOut' as const, duration: 0.15 };
 const SPRING_CONFIG = { damping: 25, stiffness: 200 }; // Low damping for sharp feel
 
 // --- Bottom Sheet Component ---
@@ -875,9 +875,10 @@ const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClos
 };
 
 const UPI_APPS = [
-  { name: 'Google Pay', package: 'com.google.android.apps.nbu.paisa.user', icon: 'https://www.gstatic.com/images/branding/product/2x/gpay_64dp.png' },
-  { name: 'PhonePe', package: 'com.phonepe.app', icon: 'https://phonepe.com/en/assets/img/phonepe-logo.png' },
-  { name: 'Paytm', package: 'net.one97.paytm', icon: 'https://static.paytm.com/common/images/paytm-logo.png' },
+  { name: 'Google Pay', package: 'com.google.android.apps.nbu.paisa.user', icon: 'https://img.icons8.com/?size=48&id=68067&format=png' },
+  { name: 'PhonePe', package: 'com.phonepe.app', icon: 'https://img.icons8.com/?size=48&id=am4ltuIYDpQ5&format=png' },
+  { name: 'Paytm', package: 'net.one97.paytm', icon: 'https://img.icons8.com/?size=48&id=OYtBxIlJwMGA&format=png' },
+  { name: 'Kiwi', package: 'com.go.kiwi', icon: 'https://gokiwi.in/logo.png' },
   { name: 'Amazon Pay', package: 'in.amazon.mShop.android.shopping', icon: 'https://m.media-amazon.com/images/G/31/AmazonPay/Logo/AmazonPay_Logo_White._CB485933534_.png' },
   { name: 'BHIM', package: 'in.org.npci.upiapp', icon: 'https://www.bhimupi.org.in/assets/images/bhim-logo.png' },
 ];
@@ -1353,7 +1354,16 @@ export default function App() {
 
   // Form states
   const [newCard, setNewCard] = useState({ bank: '', name: '', last4: '' });
-  const [newTx, setNewTx] = useState({ amount: '', merchant: '', category: 'Dining', type: 'expense', cardId: '' });
+  const [newTx, setNewTx] = useState({ 
+    amount: '', 
+    merchant: '', 
+    category: 'Dining', 
+    type: 'expense', 
+    cardId: '',
+    isUPIApp: false,
+    upiAppName: '',
+    bankCardLast4: ''
+  });
 
   // Persistence
   useEffect(() => {
@@ -1460,7 +1470,40 @@ export default function App() {
     }
   }, []);
 
-  const activeCard = cards[activeCardIndex];
+  const displayCards = useMemo(() => {
+    const bankCards = upiAccounts.map((acc, idx) => ({
+      id: acc.id,
+      name: acc.upiId,
+      bank: acc.bankName,
+      last4: acc.accountNumber.slice(-4),
+      balance: acc.balance,
+      color: CARD_COLORS[idx % CARD_COLORS.length],
+      expiry: 'UPI',
+      type: 'upi' as const
+    }));
+
+    const appCards = usedUPIApps.map((pkg, idx) => {
+      const app = UPI_APPS.find(a => a.package === pkg);
+      const appTransactions = transactions.filter(t => t.upiApp === pkg);
+      const totalSpent = appTransactions.reduce((sum, t) => sum + t.amount, 0);
+      
+      return {
+        id: pkg,
+        name: app?.name || 'UPI App',
+        bank: 'UPI App',
+        last4: 'APP',
+        balance: totalSpent,
+        color: CARD_COLORS[(bankCards.length + idx) % CARD_COLORS.length],
+        expiry: 'APP',
+        type: 'app' as const,
+        icon: app?.icon || 'https://www.gstatic.com/images/branding/product/2x/gpay_64dp.png'
+      };
+    });
+
+    return [...bankCards, ...appCards];
+  }, [upiAccounts, usedUPIApps, transactions]);
+
+  const activeCard = displayCards[activeCardIndex];
   const filteredTransactions = useMemo(() => {
     if (!activeCard) return [];
     return transactions.filter(t => t.cardId === activeCard.id);
@@ -1622,8 +1665,8 @@ export default function App() {
   }, [transactions]);
 
   const handleSwipe = (dir: number) => {
-    if (cards.length === 0) return;
-    setActiveCardIndex((prev) => (prev + dir + cards.length) % cards.length);
+    if (displayCards.length === 0) return;
+    setActiveCardIndex((prev) => (prev + dir + displayCards.length) % displayCards.length);
   };
 
   const handleDeleteTransaction = (id: string) => {
@@ -1655,25 +1698,41 @@ export default function App() {
   };
 
   const handleAddTransaction = (txData: any) => {
-    if (!activeCard && !txData.cardId) {
-      alert("Please add a card first.");
-      return;
-    }
+    const cardId = txData.cardId || activeCard?.id;
+    
     const tx: Transaction = { 
       ...txData, 
       id: Math.random().toString(36).substr(2, 9),
       date: new Date().toISOString(),
-      cardId: txData.cardId || activeCard?.id
+      cardId: cardId,
+      upiApp: txData.upiApp,
+      description: txData.bankCardLast4 ? `Paid via ${txData.upiApp} (${txData.bankCardLast4})` : (txData.description || `Manual ${txData.type}`)
     };
     setTransactions([tx, ...transactions]);
     
     // Update card balance
     setCards(prev => prev.map(c => {
-      if (c.id === tx.cardId) {
+      if (c.id === cardId) {
         return { ...c, balance: c.balance + (tx.type === 'income' ? tx.amount : -tx.amount) };
       }
       return c;
     }));
+
+    setUpiAccounts(prev => prev.map(a => {
+      if (a.id === cardId) {
+        return { ...a, balance: a.balance + (tx.type === 'income' ? tx.amount : -tx.amount) };
+      }
+      return a;
+    }));
+
+    // If it's a new UPI app, add it to used apps
+    if (txData.upiApp) {
+      const app = UPI_APPS.find(a => a.name.toLowerCase() === txData.upiApp.toLowerCase());
+      const pkg = app?.package || txData.upiApp.toLowerCase().replace(/\s/g, '.');
+      if (!usedUPIApps.includes(pkg)) {
+        setUsedUPIApps(prev => [...prev, pkg]);
+      }
+    }
 
     // Add notification
     const newNotif: Notification = {
@@ -1687,7 +1746,7 @@ export default function App() {
     setNotifications([newNotif, ...notifications]);
 
     setShowAddModal(false);
-    setNewTx({ amount: '', merchant: '', category: 'Dining', type: 'expense', cardId: '' });
+    setNewTx({ amount: '', merchant: '', category: 'Dining', type: 'expense', cardId: '', isUPIApp: false, upiAppName: '', bankCardLast4: '' });
   };
 
   const handleAddCard = () => {
@@ -1828,39 +1887,6 @@ export default function App() {
     }
   };
 
-  const displayCards = useMemo(() => {
-    const bankCards = upiAccounts.map((acc, idx) => ({
-      id: acc.id,
-      name: acc.upiId,
-      bank: acc.bankName,
-      last4: acc.accountNumber.slice(-4),
-      balance: acc.balance,
-      color: CARD_COLORS[idx % CARD_COLORS.length],
-      expiry: 'UPI',
-      type: 'upi' as const
-    }));
-
-    const appCards = usedUPIApps.map((pkg, idx) => {
-      const app = UPI_APPS.find(a => a.package === pkg);
-      const appTransactions = transactions.filter(t => t.upiApp === pkg);
-      const totalSpent = appTransactions.reduce((sum, t) => sum + t.amount, 0);
-      
-      return {
-        id: pkg,
-        name: app?.name || 'UPI App',
-        bank: 'UPI App',
-        last4: 'APP',
-        balance: totalSpent,
-        color: CARD_COLORS[(bankCards.length + idx) % CARD_COLORS.length],
-        expiry: 'APP',
-        type: 'app' as const,
-        icon: app?.icon
-      };
-    });
-
-    return [...bankCards, ...appCards];
-  }, [upiAccounts, usedUPIApps, transactions]);
-
   return (
     <div className="min-h-screen bg-surface text-on-surface font-sans selection:bg-primary selection:text-surface overflow-x-hidden">
       <AnimatePresence>
@@ -1963,29 +1989,37 @@ export default function App() {
                     <span className="text-[10px] font-bold text-primary truncate w-16 text-center">Latest</span>
                   </button>
                 )}
-                {[
-                  { name: 'Aman', upi: 'aman@paytm', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aman' },
-                  { name: 'Priya', upi: 'priya@okaxis', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Priya' },
-                  { name: 'Rahul', upi: 'rahul@ybl', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Rahul' },
-                  { name: 'Sneha', upi: 'sneha@oksbi', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sneha' },
-                  { name: 'Vikram', upi: 'vikram@okicici', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Vikram' }
-                ].map((contact, i) => (
-                  <button 
-                    key={i} 
-                    onClick={() => {
-                      setScannedUPI({ upiId: contact.upi, name: contact.name });
-                      setShowUPIPaymentModal(true);
-                    }}
-                    className="flex flex-col items-center gap-3 active:scale-90 transition-transform min-w-[70px]"
-                  >
-                    <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-primary to-secondary">
-                      <div className="w-full h-full rounded-full border-2 border-surface overflow-hidden">
-                        <img src={contact.avatar} alt={contact.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                {transactions
+                  .filter(t => t.category === 'UPI Payment' || t.upiApp)
+                  .reduce((acc, t) => {
+                    if (!acc.find(x => x.upi === t.merchant || x.upi === t.description.split('to ')[1])) {
+                      const upi = t.description.split('to ')[1] || t.merchant;
+                      acc.push({ 
+                        name: t.merchant.split(' ')[0], 
+                        upi: upi,
+                        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${upi}`
+                      });
+                    }
+                    return acc;
+                  }, [] as { name: string, upi: string, avatar: string }[])
+                  .slice(0, 6)
+                  .map((contact, i) => (
+                    <button 
+                      key={i} 
+                      onClick={() => {
+                        setScannedUPI({ upiId: contact.upi, name: contact.name });
+                        setShowUPIPaymentModal(true);
+                      }}
+                      className="flex flex-col items-center gap-3 active:scale-90 transition-transform min-w-[70px]"
+                    >
+                      <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-primary to-secondary">
+                        <div className="w-full h-full rounded-full border-2 border-surface overflow-hidden">
+                          <img src={contact.avatar} alt={contact.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        </div>
                       </div>
-                    </div>
-                    <span className="text-[10px] font-bold text-on-surface-variant">{contact.name}</span>
-                  </button>
-                ))}
+                      <span className="text-[10px] font-bold text-on-surface-variant truncate w-16 text-center">{contact.name}</span>
+                    </button>
+                  ))}
               </div>
             </section>
 
@@ -2498,39 +2532,80 @@ export default function App() {
               className="w-full bg-surface-container rounded-xl p-4 text-sm focus:outline-none border border-white/5" 
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">Card</label>
-              <select 
-                value={newTx.cardId || activeCard?.id}
-                onChange={e => setNewTx({...newTx, cardId: e.target.value})}
-                className="w-full bg-surface-container rounded-xl p-4 text-sm focus:outline-none border border-white/5 appearance-none"
-              >
-                {cards.map(c => (
-                  <option key={c.id} value={c.id}>{c.bank} ({c.last4})</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">Type</label>
-              <select 
-                value={newTx.type}
-                onChange={e => setNewTx({...newTx, type: e.target.value as any})}
-                className="w-full bg-surface-container rounded-xl p-4 text-sm focus:outline-none border border-white/5 appearance-none"
-              >
-                <option value="expense">Expense</option>
-                <option value="income">Income</option>
-              </select>
-            </div>
+          
+          <div className="flex items-center gap-2 mb-2">
+            <input 
+              type="checkbox" 
+              id="isUPIApp"
+              checked={newTx.isUPIApp}
+              onChange={e => setNewTx({...newTx, isUPIApp: e.target.checked})}
+              className="w-4 h-4 rounded border-white/10 bg-surface-container text-primary focus:ring-primary"
+            />
+            <label htmlFor="isUPIApp" className="text-xs font-bold text-on-surface-variant uppercase tracking-wider cursor-pointer">Paid via UPI App?</label>
           </div>
+
+          {newTx.isUPIApp ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">App Name</label>
+                <input 
+                  type="text" 
+                  value={newTx.upiAppName}
+                  onChange={e => setNewTx({...newTx, upiAppName: e.target.value})}
+                  placeholder="e.g. Paytm" 
+                  className="w-full bg-surface-container rounded-xl p-4 text-sm focus:outline-none border border-white/5" 
+                />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">Bank Card/ID</label>
+                <input 
+                  type="text" 
+                  value={newTx.bankCardLast4}
+                  onChange={e => setNewTx({...newTx, bankCardLast4: e.target.value})}
+                  placeholder="e.g. 1234 or HDFC" 
+                  className="w-full bg-surface-container rounded-xl p-4 text-sm focus:outline-none border border-white/5" 
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">Account/Card</label>
+                <select 
+                  value={newTx.cardId || activeCard?.id}
+                  onChange={e => setNewTx({...newTx, cardId: e.target.value})}
+                  className="w-full bg-surface-container rounded-xl p-4 text-sm focus:outline-none border border-white/5 appearance-none"
+                >
+                  {displayCards.filter(c => c.type !== 'app').map(c => (
+                    <option key={c.id} value={c.id}>{c.name} ({c.last4})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">Type</label>
+                <select 
+                  value={newTx.type}
+                  onChange={e => setNewTx({...newTx, type: e.target.value as any})}
+                  className="w-full bg-surface-container rounded-xl p-4 text-sm focus:outline-none border border-white/5 appearance-none"
+                >
+                  <option value="expense">Expense</option>
+                  <option value="income">Income</option>
+                </select>
+              </div>
+            </div>
+          )}
+
           <button 
             onClick={() => handleAddTransaction({
               amount: parseFloat(newTx.amount),
               type: newTx.type,
               category: newTx.category,
               merchant: newTx.merchant,
+              cardId: newTx.isUPIApp ? '' : (newTx.cardId || activeCard?.id),
+              upiApp: newTx.isUPIApp ? newTx.upiAppName : undefined,
+              bankCardLast4: newTx.isUPIApp ? newTx.bankCardLast4 : undefined
             })}
-            disabled={!newTx.amount || !newTx.merchant}
+            disabled={!newTx.amount || !newTx.merchant || (newTx.isUPIApp && !newTx.upiAppName)}
             className="w-full mt-4 bg-primary text-surface font-bold py-4 rounded-2xl shadow-lg active:scale-[0.98] transition-transform disabled:opacity-50"
           >
             Save Transaction
@@ -2638,27 +2713,33 @@ export default function App() {
               </div>
               
               <div className="space-y-4 mb-8">
-                {cards.map(card => (
+                {displayCards.map(card => (
                   <div key={card.id} className={cn("p-4 rounded-2xl border border-white/5 flex items-center justify-between bg-gradient-to-r", card.color)}>
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                        <CreditCard size={20} className="text-white" />
+                        {card.type === 'app' ? <Smartphone size={20} className="text-white" /> : <CreditCard size={20} className="text-white" />}
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-white">{card.bank}</p>
-                        <p className="text-[10px] text-white/60">•••• {card.last4}</p>
+                        <p className="text-sm font-bold text-white">{card.name}</p>
+                        <p className="text-[10px] text-white/60">{card.type === 'app' ? 'UPI App' : `•••• ${card.last4}`}</p>
                       </div>
                     </div>
-                    <button 
-                      onClick={() => {
-                        if (confirm(`Delete ${card.bank} card?`)) {
-                          setCards(cards.filter(c => c.id !== card.id));
-                        }
-                      }}
-                      className="w-10 h-10 rounded-full bg-error/20 flex items-center justify-center text-error"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                    {card.type !== 'app' && (
+                      <button 
+                        onClick={() => {
+                          if (confirm(`Delete ${card.name}?`)) {
+                            if (card.type === 'upi') {
+                              setUpiAccounts(upiAccounts.filter(a => a.id !== card.id));
+                            } else {
+                              setCards(cards.filter(c => c.id !== card.id));
+                            }
+                          }
+                        }}
+                        className="w-10 h-10 rounded-full bg-error/20 flex items-center justify-center text-error"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
