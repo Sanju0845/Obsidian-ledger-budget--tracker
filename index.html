@@ -5,31 +5,44 @@
       // CRITICAL FIX: Suppress "Cannot set property fetch of #<Window> which has only a getter"
       // This error occurs in some sandboxed environments where window.fetch is read-only.
       (function() {
-        // 1. Try to define a no-op setter to prevent the TypeError on assignment
-        try {
-          const originalFetch = window.fetch;
-          Object.defineProperty(window, 'fetch', {
-            get: function() { return originalFetch; },
-            set: function(v) { console.warn('Ignored attempt to overwrite window.fetch'); },
-            configurable: true,
-            enumerable: true
-          });
-        } catch (e) {
-          // 2. If the property is non-configurable, we must catch the error globally
-          // and prevent it from breaking the execution or showing up as uncaught.
-          const handleFetchError = (event) => {
-            const msg = event.message || (event.reason && event.reason.message) || "";
-            if (typeof msg === 'string' && (msg.includes('fetch') || msg.includes('getter'))) {
-              if (msg.includes('property fetch') || msg.includes('only a getter')) {
-                if (event.preventDefault) event.preventDefault();
-                if (event.stopImmediatePropagation) event.stopImmediatePropagation();
-                return true;
-              }
+        const suppressFetchError = (event) => {
+          const error = event.error || event.reason;
+          const msg = (event.message || (error && error.message) || "").toLowerCase();
+          if (msg.includes('fetch') && (msg.includes('getter') || msg.includes('read only') || msg.includes('setting property') || msg.includes('cannot set'))) {
+            if (event.preventDefault) event.preventDefault();
+            if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+            return true;
+          }
+        };
+        window.addEventListener('error', suppressFetchError, true);
+        window.addEventListener('unhandledrejection', suppressFetchError, true);
+
+        // Also use window.onerror for older browsers/environments
+        const oldOnError = window.onerror;
+        window.onerror = function(msg, url, line, col, error) {
+          const m = (msg || "").toLowerCase();
+          if (m.includes('fetch') && (m.includes('getter') || m.includes('read only') || m.includes('cannot set'))) {
+            return true; // Suppress
+          }
+          if (oldOnError) return oldOnError.apply(this, arguments);
+        };
+
+        // Try to make fetch writable on window and globalThis
+        [window, globalThis].forEach(target => {
+          try {
+            const originalFetch = target.fetch;
+            if (originalFetch) {
+              Object.defineProperty(target, 'fetch', {
+                get: function() { return originalFetch; },
+                set: function(v) { /* No-op to prevent throw */ },
+                configurable: true,
+                enumerable: true
+              });
             }
-          };
-          window.addEventListener('error', handleFetchError, true);
-          window.addEventListener('unhandledrejection', handleFetchError, true);
-        }
+          } catch (e) {
+            // If defineProperty fails, the global listeners above will handle the error
+          }
+        });
       })();
     </script>
     <meta charset="UTF-8" />

@@ -78,8 +78,61 @@ import { GoogleGenAI } from "@google/genai";
 import { Html5Qrcode } from "html5-qrcode";
 
 // --- Constants & Mock Data ---
-const INITIAL_CARDS: Card[] = [];
-const INITIAL_TRANSACTIONS: Transaction[] = [];
+const INITIAL_CARDS: Card[] = [
+  {
+    id: '1',
+    name: 'Main Account',
+    bank: 'HDFC Bank',
+    last4: '4321',
+    balance: 25000,
+    color: 'from-[#ba9eff] to-[#8455ef]',
+    expiry: '12/28',
+    type: 'debit'
+  },
+  {
+    id: '2',
+    name: 'Savings',
+    bank: 'SBI',
+    last4: '9876',
+    balance: 15000,
+    color: 'from-[#699cff] to-[#005ac2]',
+    expiry: '05/27',
+    type: 'upi'
+  }
+];
+const INITIAL_TRANSACTIONS: Transaction[] = [
+  {
+    id: '1',
+    amount: 1200,
+    type: 'expense',
+    category: 'Shopping',
+    merchant: 'Amazon',
+    date: new Date().toISOString(),
+    cardId: '1',
+    description: 'Electronics'
+  },
+  {
+    id: '2',
+    amount: 500,
+    type: 'expense',
+    category: 'Dining',
+    merchant: 'Starbucks',
+    date: new Date().toISOString(),
+    cardId: '1',
+    description: 'Coffee'
+  }
+];
+
+const INITIAL_UPI_ACCOUNTS: UPIAccount[] = [
+  {
+    id: 'upi-1',
+    upiId: 'sanju@okaxis',
+    bankName: 'Axis Bank',
+    accountNumber: 'XXXX 1234',
+    balance: 12500,
+    isDefault: true
+  }
+];
 const INITIAL_BUDGETS: Budget[] = [
   { id: '1', category: 'Dining', limit: 5000, spent: 0 },
   { id: '2', category: 'Shopping', limit: 10000, spent: 0 },
@@ -509,7 +562,7 @@ const TopAppBar = ({ profile, onProfileClick, onNotificationsClick, unreadCount 
           referrerPolicy="no-referrer"
         />
       </div>
-      <span className="ml-3 mr-4 font-headline font-bold text-white text-sm tracking-tight">{profile.name} v1.9.</span>
+      <span className="ml-3 mr-4 font-headline font-bold text-white text-sm tracking-tight">{profile.name} v2.1.</span>
     </div>
     <div className="flex gap-2">
       <button 
@@ -1263,11 +1316,13 @@ const RequestMoneyModal = ({ onClose }: { onClose: () => void }) => {
 export default function App() {
   const [cards, setCards] = useState<Card[]>(() => {
     const saved = localStorage.getItem('obsidian_cards');
-    return saved ? JSON.parse(saved) : INITIAL_CARDS;
+    const parsed = saved ? JSON.parse(saved) : null;
+    return (parsed && parsed.length > 0) ? parsed : INITIAL_CARDS;
   });
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem('obsidian_transactions');
-    return saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS;
+    const parsed = saved ? JSON.parse(saved) : null;
+    return (parsed && parsed.length > 0) ? parsed : INITIAL_TRANSACTIONS;
   });
   const [budgets, setBudgets] = useState<Budget[]>(() => {
     const saved = localStorage.getItem('obsidian_budgets');
@@ -1275,7 +1330,8 @@ export default function App() {
   });
   const [upiAccounts, setUpiAccounts] = useState<UPIAccount[]>(() => {
     const saved = localStorage.getItem('obsidian_upi_accounts');
-    return saved ? JSON.parse(saved) : [];
+    const parsed = saved ? JSON.parse(saved) : null;
+    return (parsed && parsed.length > 0) ? parsed : INITIAL_UPI_ACCOUNTS;
   });
 
   const [activeCardIndex, setActiveCardIndex] = useState(0);
@@ -1680,8 +1736,8 @@ export default function App() {
   };
 
   const totalBalance = useMemo(() => {
-    const cardsTotal = cards.reduce((acc, c) => acc + c.balance, 0);
-    const upiTotal = upiAccounts.reduce((acc, a) => acc + a.balance, 0);
+    const cardsTotal = cards.reduce((acc, c) => acc + (Number(c.balance) || 0), 0);
+    const upiTotal = upiAccounts.reduce((acc, a) => acc + (Number(a.balance) || 0), 0);
     return cardsTotal + upiTotal;
   }, [cards, upiAccounts]);
 
@@ -1941,11 +1997,7 @@ export default function App() {
 
       <main className="pt-24 px-4 pb-40 max-w-2xl mx-auto">
         {activeTab === 'home' && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }} 
-            animate={{ opacity: 1, y: 0 }}
-            transition={SMOOTH_TRANSITION}
-          >
+          <div className="animate-none">
             <section className="mb-10 px-2">
               <span className="text-on-surface-variant font-label text-sm uppercase tracking-widest">Total Liquidity</span>
               <h1 className="font-headline text-6xl mt-2 tracking-tighter">
@@ -2082,27 +2134,17 @@ export default function App() {
                 )}
               </div>
             </section>
-          </motion.div>
+          </div>
         )}
 
         {activeTab === 'budget' && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            transition={SMOOTH_TRANSITION}
-            className="pt-4"
-          >
+          <div className="pt-4 animate-none">
             <AnalyticsView transactions={transactions} profile={profile} budgets={budgets} />
-          </motion.div>
+          </div>
         )}
 
         {activeTab === 'upi' && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            transition={SMOOTH_TRANSITION}
-            className="pt-4"
-          >
+          <div className="pt-4 animate-none">
             <UPIManagement 
               accounts={upiAccounts} 
               transactions={transactions}
@@ -2111,16 +2153,11 @@ export default function App() {
               onSetDefault={(id) => setUpiAccounts(prev => prev.map(a => ({ ...a, isDefault: a.id === id })))}
               currency={profile.currency}
             />
-          </motion.div>
+          </div>
         )}
 
         {activeTab === 'categories' && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            transition={SMOOTH_TRANSITION}
-            className="pt-4"
-          >
+          <div className="pt-4 animate-none">
             <div className="flex items-center gap-4 mb-8">
               {selectedCategory && (
                 <button onClick={() => setSelectedCategory(null)} className="text-primary">
@@ -2186,16 +2223,11 @@ export default function App() {
                 )}
               </div>
             )}
-          </motion.div>
+          </div>
         )}
 
         {activeTab === 'profile' && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            transition={SMOOTH_TRANSITION}
-            className="pt-4"
-          >
+          <div className="pt-4 animate-none">
             <h1 className="font-headline text-4xl font-bold mb-8">Settings</h1>
             
             <div className="flex flex-col items-center mb-10">
@@ -2340,16 +2372,11 @@ export default function App() {
                 </button>
               </div>
             </div>
-          </motion.div>
+          </div>
         )}
 
         {activeTab === 'transactions' && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            transition={SMOOTH_TRANSITION}
-            className="pt-4"
-          >
+          <div className="pt-4 animate-none">
             <div className="flex justify-between items-center mb-8">
               <h1 className="font-headline text-4xl font-bold">Transactions</h1>
               <div className="flex gap-2">
@@ -2431,7 +2458,7 @@ export default function App() {
                 </div>
               </div>
             </div>
-          </motion.div>
+          </div>
         )}
       </main>
 
