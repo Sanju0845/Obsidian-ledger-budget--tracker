@@ -509,7 +509,7 @@ const TopAppBar = ({ profile, onProfileClick, onNotificationsClick, unreadCount 
           referrerPolicy="no-referrer"
         />
       </div>
-      <span className="ml-3 mr-4 font-headline font-bold text-white text-sm tracking-tight">{profile.name} v1.8.</span>
+      <span className="ml-3 mr-4 font-headline font-bold text-white text-sm tracking-tight">{profile.name} v1.9.</span>
     </div>
     <div className="flex gap-2">
       <button 
@@ -1301,15 +1301,46 @@ export default function App() {
     // Directly trigger native UPI chooser or specific app after a short delay
     setTimeout(() => {
       if (scannedUPI) {
-        const upiUrl = `upi://pay?pa=${scannedUPI.upiId}&pn=${encodeURIComponent(scannedUPI.name || 'Merchant')}&am=${amount}&cu=INR&tn=${encodeURIComponent('Payment via Obsidian')}`;
+        // Generate a unique transaction reference
+        const tr = `OB-${Date.now()}`;
+        // Add more standard parameters: mc=0000 (generic), mode=02 (static QR/deep link), orgid=000000
+        const upiUrl = `upi://pay?pa=${scannedUPI.upiId}&pn=${encodeURIComponent(scannedUPI.name || 'Merchant')}&am=${amount}&cu=INR&tn=${encodeURIComponent('Payment via Obsidian')}&tr=${tr}&mc=0000&mode=02&orgid=000000`;
         
         let link = upiUrl;
         if (appPackage) {
           // Use Android Intent for specific app targeting
-          link = `intent://pay?pa=${scannedUPI.upiId}&pn=${encodeURIComponent(scannedUPI.name || 'Merchant')}&am=${amount}&cu=INR&tn=${encodeURIComponent('Payment via Obsidian')}#Intent;scheme=upi;package=${appPackage};end`;
+          // This is more reliable for redirecting to a specific app on Android
+          link = `intent://pay?pa=${scannedUPI.upiId}&pn=${encodeURIComponent(scannedUPI.name || 'Merchant')}&am=${amount}&cu=INR&tn=${encodeURIComponent('Payment via Obsidian')}&tr=${tr}&mc=0000&mode=02&orgid=000000#Intent;scheme=upi;package=${appPackage};end`;
         }
           
-        window.location.href = link;
+        // Use a more robust redirection method
+        // Creating a hidden link and clicking it can bypass some iframe/browser restrictions
+        const a = document.createElement('a');
+        a.href = link;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        
+        try {
+          // Attempt to open in a new tab if possible, or just click
+          // Some UPI apps respond better to a direct click
+          a.click();
+          
+          // Fallback if click doesn't work
+          setTimeout(() => {
+            if (document.body.contains(a)) {
+              window.location.href = link;
+            }
+          }, 100);
+        } catch (err) {
+          console.error("Redirection failed:", err);
+          window.location.href = link;
+        } finally {
+          setTimeout(() => {
+            if (document.body.contains(a)) {
+              document.body.removeChild(a);
+            }
+          }, 500);
+        }
         
         // Record the transaction
         handleUPIPay(parseFloat(amount), accountId, appPackage);
@@ -1648,7 +1679,11 @@ export default function App() {
     reader.readAsText(file);
   };
 
-  const totalBalance = useMemo(() => cards.reduce((acc, c) => acc + c.balance, 0), [cards]);
+  const totalBalance = useMemo(() => {
+    const cardsTotal = cards.reduce((acc, c) => acc + c.balance, 0);
+    const upiTotal = upiAccounts.reduce((acc, a) => acc + a.balance, 0);
+    return cardsTotal + upiTotal;
+  }, [cards, upiAccounts]);
 
   const totalIncome = useMemo(() => 
     transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0),
@@ -1750,7 +1785,7 @@ export default function App() {
     setNotifications([newNotif, ...notifications]);
 
     setShowAddModal(false);
-    setNewTx({ amount: '', merchant: '', category: 'Dining', type: 'expense', cardId: '', isUPIApp: false, upiAppName: '', bankCardLast4: '' });
+    setNewTx({ amount: '', merchant: '', category: 'Shopping', type: 'expense', cardId: '', isUPIApp: false, upiAppName: '', bankCardLast4: '' });
   };
 
   const handleAddCard = () => {
