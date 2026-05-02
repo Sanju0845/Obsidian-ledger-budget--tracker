@@ -649,7 +649,7 @@ const CardStack = React.memo(({ cards, activeIndex, onSwipe, currency }: { cards
                   </p>
                   <div className="flex justify-between items-end">
                     <div>
-                      <p className="text-[10px] uppercase font-label text-white/60 mb-1">{card.type === 'app' ? 'Total Spent' : 'Balance'}</p>
+                      <p className="text-[10px] uppercase font-label text-white/60 mb-1">Balance</p>
                       <p className="font-headline text-xl text-white font-bold">{formatCurrency(card.balance, currency)}</p>
                     </div>
                     <div className="text-right">
@@ -941,6 +941,8 @@ const UPIPaymentModal = ({
   upiData, 
   accounts, 
   cards,
+  usedUPIApps,
+  upiAppBalances,
   onContinue,
   onClose,
   onAddAccount,
@@ -949,13 +951,15 @@ const UPIPaymentModal = ({
   upiData: { upiId: string, name?: string, amount?: string }, 
   accounts: UPIAccount[], 
   cards: Card[],
+  usedUPIApps: string[],
+  upiAppBalances: Record<string, number>,
   onContinue: (amount: string, accountId: string, appPackage?: string) => void,
   onClose: () => void,
   onAddAccount: () => void,
   currency: string
 }) => {
   const [amount, setAmount] = useState(upiData.amount || '');
-  const [selectedAccountId, setSelectedAccountId] = useState(accounts.find(a => a.isDefault)?.id || accounts[0]?.id || cards[0]?.id);
+  const [selectedAccountId, setSelectedAccountId] = useState(accounts.find(a => a.isDefault)?.id || accounts[0]?.id || cards[0]?.id || (usedUPIApps.length > 0 ? usedUPIApps[0] : ''));
   const [isPaying, setIsPaying] = useState(false);
   const [activeTab, setActiveTab] = useState<'internal' | 'apps'>('apps');
 
@@ -965,7 +969,13 @@ const UPIPaymentModal = ({
       onAddAccount();
       return;
     }
-    onContinue(amount, selectedAccountId || 'direct', appPackage);
+    
+    // If we're in the internal tab and selected an app package as accountId
+    if (activeTab === 'internal' && usedUPIApps.includes(selectedAccountId)) {
+      onContinue(amount, 'app_wallet', selectedAccountId);
+    } else {
+      onContinue(amount, selectedAccountId || 'direct', appPackage);
+    }
   };
 
   return (
@@ -1073,6 +1083,36 @@ const UPIPaymentModal = ({
                   </button>
                 ) : (
                   <>
+                    {/* UPI Apps as Wallets */}
+                    {usedUPIApps.map(pkg => {
+                      const app = UPI_APPS.find(a => a.package === pkg);
+                      const balance = upiAppBalances[pkg] || 0;
+                      return (
+                        <button 
+                          key={pkg}
+                          onClick={() => setSelectedAccountId(pkg)}
+                          className={cn(
+                            "w-full p-4 rounded-2xl border transition-all flex items-center justify-between",
+                            selectedAccountId === pkg ? "bg-primary/10 border-primary shadow-lg" : "bg-surface-container border-white/5 hover:bg-surface-container-high"
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-white/5 p-1.5 flex items-center justify-center">
+                              <img src={app?.icon} alt={app?.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                            </div>
+                            <div className="text-left">
+                              <p className="font-bold text-sm">{app?.name || 'App Wallet'}</p>
+                              <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest">Wallet / App Balance</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-sm">₹{(balance || 0).toLocaleString()}</p>
+                            {selectedAccountId === pkg && <div className="w-2 h-2 rounded-full bg-primary ml-auto mt-1" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+
                     {accounts.map(acc => (
                       <button 
                         key={acc.id}
@@ -1138,58 +1178,152 @@ const UPIPaymentModal = ({
   );
 };
 
-const UPIManagement = ({ accounts, transactions, onAdd, onDelete, onSetDefault, currency }: { accounts: UPIAccount[], transactions: Transaction[], onAdd: () => void, onDelete: (id: string) => void, onSetDefault: (id: string) => void, currency: string }) => {
+const UPIManagement = ({ 
+  accounts, 
+  transactions, 
+  onAdd, 
+  onDelete, 
+  onSetDefault, 
+  currency,
+  usedUPIApps,
+  upiAppBalances,
+  onUpdateAppBalance,
+  onUpdateBalance,
+  onDeleteApp
+}: { 
+  accounts: UPIAccount[], 
+  transactions: Transaction[], 
+  onAdd: () => void, 
+  onDelete: (id: string) => void, 
+  onSetDefault: (id: string) => void, 
+  currency: string,
+  usedUPIApps: string[],
+  upiAppBalances: Record<string, number>,
+  onUpdateAppBalance: (pkg: string, balance: number) => void,
+  onUpdateBalance: (id: string, balance: number) => void,
+  onDeleteApp: (pkg: string) => void
+}) => {
   const upiTransactions = transactions.filter(t => t.cardId === 'upi').slice(0, 5);
 
   return (
     <div className="space-y-8 pb-32">
       <div>
         <h1 className="font-headline text-4xl font-bold">UPI Accounts</h1>
-        <p className="text-on-surface-variant text-sm">Manage your linked bank accounts</p>
+        <p className="text-on-surface-variant text-sm">Manage your linked bank accounts and apps</p>
       </div>
 
       <div className="space-y-4">
-        {accounts.map(acc => (
-          <div key={acc.id} className="bg-surface-container-low p-6 rounded-[32px] border border-white/5 shadow-xl">
-            <div className="flex justify-between items-start mb-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-                  <Wallet size={24} />
+        {/* Bank Accounts Section */}
+        <div className="space-y-2">
+          <h2 className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest px-2">Bank Accounts</h2>
+          {accounts.map(acc => (
+            <div key={acc.id} className="bg-surface-container-low p-6 rounded-[32px] border border-white/5 shadow-xl">
+              <div className="flex justify-between items-start mb-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                    <Wallet size={24} />
+                  </div>
+                  <div>
+                    <h3 className="font-headline font-bold text-lg">{acc.bankName}</h3>
+                    <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest">{acc.upiId}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-headline font-bold text-lg">{acc.bankName}</h3>
-                  <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest">{acc.upiId}</p>
-                </div>
-              </div>
-              {acc.isDefault && (
-                <span className="bg-primary/20 text-primary text-[8px] font-bold px-2 py-1 rounded-full uppercase tracking-widest">Default</span>
-              )}
-            </div>
-
-            <div className="flex justify-between items-end">
-              <div>
-                <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-1">Balance</p>
-                <p className="text-xl font-bold">₹{(acc.balance || 0).toLocaleString()}</p>
-              </div>
-              <div className="flex gap-2">
-                {!acc.isDefault && (
-                  <button 
-                    onClick={() => onSetDefault(acc.id)}
-                    className="p-2 rounded-full bg-white/5 text-on-surface-variant hover:text-primary transition-colors"
-                  >
-                    <Check size={20} />
-                  </button>
+                {acc.isDefault && (
+                  <span className="bg-primary/20 text-primary text-[8px] font-bold px-2 py-1 rounded-full uppercase tracking-widest">Default</span>
                 )}
-                <button 
-                  onClick={() => onDelete(acc.id)}
-                  className="p-2 rounded-full bg-white/5 text-on-surface-variant hover:text-error transition-colors"
-                >
-                  <Trash2 size={20} />
-                </button>
+              </div>
+
+              <div className="flex justify-between items-end">
+                <div>
+                  <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-1">Balance</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xl font-bold">₹{(acc.balance || 0).toLocaleString()}</p>
+                    <button 
+                      onClick={() => {
+                        const newBalance = prompt(`Enter new balance for ${acc.bankName}`, acc.balance.toString());
+                        if (newBalance !== null) {
+                          onUpdateBalance(acc.id, Number(newBalance) || 0);
+                        }
+                      }}
+                      className="p-1 rounded-full bg-white/5 text-on-surface-variant hover:text-primary transition-colors"
+                    >
+                      <Settings size={14} />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {!acc.isDefault && (
+                    <button 
+                      onClick={() => onSetDefault(acc.id)}
+                      className="p-2 rounded-full bg-white/5 text-on-surface-variant hover:text-primary transition-colors"
+                    >
+                      <Check size={20} />
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => onDelete(acc.id)}
+                    className="p-2 rounded-full bg-white/5 text-on-surface-variant hover:text-error transition-colors"
+                  >
+                    <Trash2 size={20} />
+                  </button>
+                </div>
               </div>
             </div>
+          ))}
+        </div>
+
+        {/* UPI Apps Section */}
+        {usedUPIApps.length > 0 && (
+          <div className="space-y-2 mt-8">
+            <h2 className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest px-2">UPI Apps & Wallets</h2>
+            {usedUPIApps.map(pkg => {
+              const app = UPI_APPS.find(a => a.package === pkg);
+              const balance = upiAppBalances[pkg] || 0;
+              
+              return (
+                <div key={pkg} className="bg-surface-container-low p-6 rounded-[32px] border border-white/5 shadow-xl">
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-white/5 p-2 flex items-center justify-center">
+                        <img src={app?.icon} alt={app?.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                      </div>
+                      <div>
+                        <h3 className="font-headline font-bold text-lg">{app?.name || 'UPI App'}</h3>
+                        <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest">{pkg}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-end">
+                    <div>
+                      <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-1">Balance</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xl font-bold">₹{(balance || 0).toLocaleString()}</p>
+                        <button 
+                          onClick={() => {
+                            const newBalance = prompt('Enter new balance for ' + (app?.name || 'App'), balance.toString());
+                            if (newBalance !== null) {
+                              onUpdateAppBalance(pkg, Number(newBalance) || 0);
+                            }
+                          }}
+                          className="p-1 rounded-full bg-white/5 text-on-surface-variant hover:text-primary transition-colors"
+                        >
+                          <Settings size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => onDeleteApp(pkg)}
+                      className="p-2 rounded-full bg-white/5 text-on-surface-variant hover:text-error transition-colors"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        ))}
+        )}
 
         <button 
           onClick={onAdd}
@@ -1419,6 +1553,15 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [upiAppBalances, setUpiAppBalances] = useState<Record<string, number>>(() => {
+    const saved = localStorage.getItem('obsidian_upi_app_balances');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  useEffect(() => {
+    localStorage.setItem('obsidian_upi_app_balances', JSON.stringify(upiAppBalances));
+  }, [upiAppBalances]);
+
   const [latestScannedUPI, setLatestScannedUPI] = useState<{ upiId: string, name?: string } | null>(() => {
     const saved = localStorage.getItem('obsidian_latest_scanned_upi');
     return saved ? JSON.parse(saved) : null;
@@ -1575,15 +1718,14 @@ export default function App() {
 
     const appCards = usedUPIApps.map((pkg, idx) => {
       const app = UPI_APPS.find(a => a.package === pkg);
-      const appTransactions = transactions.filter(t => t.upiApp === pkg);
-      const totalSpent = appTransactions.reduce((sum, t) => sum + t.amount, 0);
+      const appBalance = upiAppBalances[pkg] || 0;
       
       return {
         id: pkg,
         name: app?.name || 'UPI App',
         bank: 'UPI App',
         last4: 'APP',
-        balance: totalSpent,
+        balance: appBalance,
         color: CARD_COLORS[(bankCards.length + idx) % CARD_COLORS.length],
         expiry: 'APP',
         type: 'app' as const,
@@ -1591,8 +1733,8 @@ export default function App() {
       };
     });
 
-    return [...bankCards, ...appCards];
-  }, [upiAccounts, usedUPIApps, transactions]);
+    return [...cards, ...bankCards, ...appCards];
+  }, [cards, upiAccounts, usedUPIApps, upiAppBalances]);
 
   const activeCard = displayCards[activeCardIndex];
   const filteredTransactions = useMemo(() => {
@@ -1639,8 +1781,17 @@ export default function App() {
   }, []);
 
   const handleUPIPay = (amount: number, accountId: string, appPackage?: string) => {
-    // If appPackage is provided, it's an external app payment
-    if (appPackage) {
+    // If it's a specific app wallet payment, deduct from app balance
+    if (accountId === 'app_wallet' && appPackage) {
+      if (!usedUPIApps.includes(appPackage)) {
+        setUsedUPIApps(prev => [...prev, appPackage]);
+      }
+      setUpiAppBalances(prev => {
+        const currentBalance = prev[appPackage] || 0;
+        return { ...prev, [appPackage]: currentBalance - amount };
+      });
+    } else if (appPackage) {
+      // Just tracking the app usage if used as gateway
       if (!usedUPIApps.includes(appPackage)) {
         setUsedUPIApps(prev => [...prev, appPackage]);
       }
@@ -1664,7 +1815,7 @@ export default function App() {
       category: 'UPI Payment',
       merchant: scannedUPI?.name || scannedUPI?.upiId || 'UPI Transfer',
       date: new Date().toISOString(),
-      cardId: appPackage || accountId || 'upi', 
+      cardId: (accountId && accountId !== 'app_wallet' && accountId !== 'direct') ? accountId : (appPackage || 'upi'), 
       description: `UPI Payment via ${appInfo?.name || 'UPI App'} to ${scannedUPI?.upiId}`,
       upiApp: appPackage
     };
@@ -1738,8 +1889,9 @@ export default function App() {
   const totalBalance = useMemo(() => {
     const cardsTotal = cards.reduce((acc, c) => acc + (Number(c.balance) || 0), 0);
     const upiTotal = upiAccounts.reduce((acc, a) => acc + (Number(a.balance) || 0), 0);
-    return cardsTotal + upiTotal;
-  }, [cards, upiAccounts]);
+    const appTotal = Object.values(upiAppBalances).reduce((acc: number, b) => acc + (Number(b) || 0), 0);
+    return cardsTotal + upiTotal + appTotal;
+  }, [cards, upiAccounts, upiAppBalances]);
 
   const totalIncome = useMemo(() => 
     transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0),
@@ -2152,6 +2304,18 @@ export default function App() {
               onDelete={(id) => setUpiAccounts(prev => prev.filter(a => a.id !== id))}
               onSetDefault={(id) => setUpiAccounts(prev => prev.map(a => ({ ...a, isDefault: a.id === id })))}
               currency={profile.currency}
+              usedUPIApps={usedUPIApps}
+              upiAppBalances={upiAppBalances}
+              onUpdateAppBalance={(pkg, balance) => setUpiAppBalances(prev => ({ ...prev, [pkg]: balance }))}
+              onUpdateBalance={(id, balance) => setUpiAccounts(prev => prev.map(a => a.id === id ? { ...a, balance } : a))}
+              onDeleteApp={(pkg) => {
+                setUsedUPIApps(prev => prev.filter(p => p !== pkg));
+                setUpiAppBalances(prev => {
+                  const next = { ...prev };
+                  delete next[pkg];
+                  return next;
+                });
+              }}
             />
           </div>
         )}
@@ -2821,22 +2985,42 @@ export default function App() {
                         <p className="text-[10px] text-white/60">{card.type === 'app' ? 'UPI App' : `•••• ${card.last4}`}</p>
                       </div>
                     </div>
-                    {card.type !== 'app' && (
+                    <div className="flex gap-2">
                       <button 
                         onClick={() => {
-                          if (confirm(`Delete ${card.name}?`)) {
-                            if (card.type === 'upi') {
-                              setUpiAccounts(upiAccounts.filter(a => a.id !== card.id));
+                          const newBalance = prompt(`Enter new balance for ${card.name}`, card.balance.toString());
+                          if (newBalance !== null) {
+                            const balanceValue = Number(newBalance) || 0;
+                            if (card.type === 'app') {
+                              setUpiAppBalances(prev => ({ ...prev, [card.id]: balanceValue }));
+                            } else if (card.type === 'upi') {
+                              setUpiAccounts(prev => prev.map(a => a.id === card.id ? { ...a, balance: balanceValue } : a));
                             } else {
-                              setCards(cards.filter(c => c.id !== card.id));
+                              setCards(prev => prev.map(c => c.id === card.id ? { ...c, balance: balanceValue } : c));
                             }
                           }
                         }}
-                        className="w-10 h-10 rounded-full bg-error/20 flex items-center justify-center text-error"
+                        className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary"
                       >
-                        <Trash2 size={18} />
+                        <Settings size={18} />
                       </button>
-                    )}
+                      {card.type !== 'app' && (
+                        <button 
+                          onClick={() => {
+                            if (confirm(`Delete ${card.name}?`)) {
+                              if (card.type === 'upi') {
+                                setUpiAccounts(upiAccounts.filter(a => a.id !== card.id));
+                              } else {
+                                setCards(cards.filter(c => c.id !== card.id));
+                              }
+                            }
+                          }}
+                          className="w-10 h-10 rounded-full bg-error/20 flex items-center justify-center text-error"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -2948,6 +3132,8 @@ export default function App() {
             upiData={scannedUPI} 
             accounts={upiAccounts} 
             cards={cards}
+            usedUPIApps={usedUPIApps}
+            upiAppBalances={upiAppBalances}
             onContinue={handleUPIContinue} 
             onClose={() => setShowUPIPaymentModal(false)}
             onAddAccount={() => {
