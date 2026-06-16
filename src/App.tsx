@@ -799,6 +799,16 @@ const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClos
       await scannerRef.current.stop();
     }
     
+    // Explicitly request stream permission first to force Capacitor/Android permission prompt to trigger
+    try {
+      if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === "function") {
+        const tempStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode } });
+        tempStream.getTracks().forEach(track => track.stop());
+      }
+    } catch (permErr: any) {
+      console.warn("Permission pre-flight check error:", permErr);
+    }
+
     const html5QrCode = scannerRef.current || new Html5Qrcode("reader");
     scannerRef.current = html5QrCode;
 
