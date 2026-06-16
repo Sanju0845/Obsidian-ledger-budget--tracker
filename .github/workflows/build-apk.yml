@@ -5,6 +5,9 @@ on:
     branches:
       - main
       - master
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -19,7 +22,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'
           cache: 'npm'
 
       - name: Install Dependencies
@@ -32,7 +35,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21' # Upgraded to match standard Java 21 for modern Gradle/Capacitor builds
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
