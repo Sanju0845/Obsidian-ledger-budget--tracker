@@ -81,6 +81,17 @@ import { Html5Qrcode } from "html5-qrcode";
 import { NativeBiometric } from 'capacitor-native-biometric';
 import { Capacitor } from '@capacitor/core';
 
+// Modular Page components
+import { HomeView } from './components/HomeView';
+import { BudgetView } from './components/BudgetView';
+import { ScanView } from './components/ScanView';
+import { LedgerView } from './components/LedgerView';
+import { SettingsView } from './components/SettingsView';
+import { TransactionItem, formatCurrency } from './components/TransactionItem';
+import { CardStack } from './components/CardStack';
+import { UPI_APPS, CATEGORY_ICONS, AVAILABLE_BANKS } from './components/constants';
+import { SwipeableItem } from './components/SwipeableItem';
+
 // --- Constants & Mock Data ---
 const INITIAL_CARDS: Card[] = [];
 const INITIAL_TRANSACTIONS: Transaction[] = [];
@@ -330,7 +341,7 @@ const AppLock = ({ onUnlock, savedPin }: { onUnlock: () => void, savedPin: strin
 };
 
 // --- Analytics View Component ---
-const AnalyticsView = ({ transactions, profile, budgets }: { transactions: Transaction[], profile: any, budgets: Budget[] }) => {
+const AnalyticsViewOld = ({ transactions, profile, budgets }: { transactions: Transaction[], profile: any, budgets: Budget[] }) => {
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year'>('month');
 
   const chartData = useMemo(() => {
@@ -493,7 +504,7 @@ const AnalyticsView = ({ transactions, profile, budgets }: { transactions: Trans
   );
 };
 
-const SwipeableItem = ({ children, onDelete, onEdit, className }: { children: React.ReactNode, onDelete?: () => void, onEdit?: () => void, className?: string, key?: any }) => {
+const SwipeableItemOld = ({ children, onDelete, onEdit, className }: { children: React.ReactNode, onDelete?: () => void, onEdit?: () => void, className?: string, key?: any }) => {
   const [isOpen, setIsOpen] = useState<string | null>(null);
   const controls = useAnimation();
   const isMounted = useRef(true);
@@ -563,7 +574,7 @@ const SwipeableItem = ({ children, onDelete, onEdit, className }: { children: Re
 };
 
 // --- Helpers ---
-const formatCurrency = (amount: number | undefined, currency: string) => {
+const formatCurrencyOld = (amount: number | undefined, currency: string) => {
   if (amount === undefined || amount === null) return '₹0.00';
   const symbol = currency === 'INR' ? '₹' : '$';
   return `${symbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -601,7 +612,7 @@ const TopAppBar = ({ profile, onProfileClick, onNotificationsClick, unreadCount 
   </header>
 );
 
-const CardStack = React.memo(({ cards, activeIndex, onSwipe, currency }: { cards: Card[], activeIndex: number, onSwipe: (dir: number) => void, currency: string }) => {
+const CardStackOld = React.memo(({ cards, activeIndex, onSwipe, currency }: { cards: Card[], activeIndex: number, onSwipe: (dir: number) => void, currency: string }) => {
   return (
     <section className="relative mb-12 h-64 px-6">
       <div className="relative h-full w-full max-w-md mx-auto flex items-center justify-center">
@@ -689,7 +700,7 @@ const CardStack = React.memo(({ cards, activeIndex, onSwipe, currency }: { cards
   );
 });
 
-const TransactionItem = ({ transaction, onDelete, currency }: { transaction: Transaction, onDelete?: (id: string) => void, currency: string, key?: React.Key }) => {
+const TransactionItemOld = ({ transaction, onDelete, currency }: { transaction: Transaction, onDelete?: (id: string) => void, currency: string, key?: React.Key }) => {
   const upiApp = transaction.upiApp ? UPI_APPS.find(a => a.package === transaction.upiApp) : null;
   const Icon = CATEGORY_ICONS[transaction.category] || ReceiptText;
   const isExpense = transaction.type === 'expense';
@@ -786,7 +797,7 @@ const BottomNavBar = ({ activeTab, onTabChange }: { activeTab: string, onTabChan
 
 // --- UPI Components ---
 
-const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClose: () => void }) => {
+const QRScannerOld = ({ onScan, onClose }: { onScan: (data: string) => void, onClose: () => void }) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
@@ -1010,7 +1021,7 @@ const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClos
   );
 };
 
-const UPI_APPS = [
+const UPI_APPS_OLD = [
   { name: 'PhonePe', package: 'com.phonepe.app', icon: 'https://img.icons8.com/?size=48&id=R8eaasv58f5O&format=png' },
   { name: 'Paytm', package: 'net.one97.paytm', icon: 'https://img.icons8.com/?size=48&id=68067&format=png' },
   { name: 'Google Pay', package: 'com.google.android.apps.nbu.paisa.user', icon: 'https://img.icons8.com/?size=48&id=am4ltuIYDpQ5&format=png' },
@@ -1601,15 +1612,34 @@ export default function App() {
           
         if (Capacitor.isNativePlatform()) {
           console.log("Opening native UPI platform link:", link);
-          // In Capacitor native WebView, standard redirection/clicks are blocked. 
-          // We MUST use window.open with '_system' to delegate the deep-link directly to Android OS.
-          window.open(link, '_system');
+          // Standard redirection is ideal for unhandled deep-link custom schemes to let OS catch them
+          try {
+            window.location.href = link;
+          } catch (e) {
+            console.error("Native location redirection failed:", e);
+          }
+          
+          // Delegation fallback to assist OS in launching specific schemes if standard intercept fails
+          try {
+            window.open(link, '_system');
+          } catch (e) {
+            console.error("Native system window open failed:", e);
+          }
 
           // Fallback after short delay - if specific deep link scheme is not configured on OS, open standard chooser
           if (appPackage) {
             setTimeout(() => {
-              window.open(upiUrl, '_system');
-            }, 350);
+              try {
+                window.location.href = upiUrl;
+              } catch (e) {
+                console.error("Native location upiUrl redirection failed:", e);
+              }
+              try {
+                window.open(upiUrl, '_system');
+              } catch (e) {
+                console.error("Native system upiUrl open failed:", e);
+              }
+            }, 500);
           }
         } else {
           // Web Preview / Desktop Fallback
@@ -2276,150 +2306,40 @@ export default function App() {
 
       <main className="pt-24 px-4 pb-40 max-w-2xl mx-auto">
         {activeTab === 'home' && (
-          <div className="animate-none">
-            <section className="mb-10 px-2">
-              <span className="text-on-surface-variant font-label text-sm uppercase tracking-widest">Total Liquidity</span>
-              <h1 className="font-headline text-6xl mt-2 tracking-tighter">
-                {formatCurrency(totalBalance, profile.currency)}
-              </h1>
-              <div className="flex gap-4 mt-4">
-                <div className="flex items-center gap-2 text-secondary">
-                  <ArrowDownLeft size={16} />
-                  <span className="text-sm font-bold">+{formatCurrency(totalIncome, profile.currency)}</span>
-                </div>
-                <div className="flex items-center gap-2 text-error">
-                  <ArrowUpRight size={16} />
-                  <span className="text-sm font-bold">-{formatCurrency(totalExpense, profile.currency)}</span>
-                </div>
-              </div>
-            </section>
-
-            {displayCards.length > 0 ? (
-              <CardStack cards={displayCards} activeIndex={activeCardIndex} onSwipe={handleSwipe} currency={profile.currency} />
-            ) : (
-              <div 
-                onClick={() => handleTabChange('upi')}
-                className="h-52 mb-12 rounded-2xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-3 text-on-surface-variant hover:text-white hover:border-white/20 transition-all cursor-pointer"
-              >
-                <Plus size={32} />
-                <p className="font-headline text-lg font-bold">Link your first account</p>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-10">
-              <button 
-                onClick={() => handleTabChange('upi')}
-                className="glass-header rounded-xl py-4 flex flex-col items-center justify-center gap-2 hover:bg-surface-container transition-colors border-primary/20 border"
-              >
-                <Wallet className="text-primary" size={20} />
-                <span className="font-label text-[10px] font-bold text-on-surface uppercase tracking-wider">UPI Accounts</span>
-              </button>
-              <button 
-                onClick={() => setShowSmsModal(true)}
-                className="glass-header rounded-xl py-4 flex flex-col items-center justify-center gap-2 hover:bg-surface-container transition-colors"
-              >
-                <Upload className="text-secondary" size={20} />
-                <span className="font-label text-[10px] font-bold text-on-surface uppercase tracking-wider">Sync SMS</span>
-              </button>
-              <button 
-                onClick={() => setShowAddModal(true)}
-                className="glass-header rounded-xl py-4 flex flex-col items-center justify-center gap-2 hover:bg-surface-container transition-colors"
-              >
-                <PlusCircle className="text-tertiary" size={20} />
-                <span className="font-label text-[10px] font-bold text-on-surface uppercase tracking-wider">Add Tx</span>
-              </button>
-              <button 
-                onClick={() => setShowManageCardsModal(true)}
-                className="glass-header rounded-xl py-4 flex flex-col items-center justify-center gap-2 hover:bg-surface-container transition-colors"
-              >
-                <CreditCard className="text-secondary" size={20} />
-                <span className="font-label text-[10px] font-bold text-on-surface uppercase tracking-wider">Manage Cards</span>
-              </button>
-            </div>
-
-            <section className="mb-10">
-              <div className="flex justify-between items-end mb-4 px-2">
-                <h2 className="font-headline text-2xl font-bold">Quick Transfer</h2>
-                <span className="text-primary text-sm font-bold cursor-pointer">View All</span>
-              </div>
-              <div className="flex gap-6 overflow-x-auto no-scrollbar pb-2">
-                {latestScannedUPI && (
-                  <button 
-                    onClick={() => {
-                      setScannedUPI({ upiId: latestScannedUPI.upiId, name: latestScannedUPI.name });
-                      setShowUPIPaymentModal(true);
-                    }}
-                    className="flex flex-col items-center gap-3 active:scale-90 transition-transform min-w-[70px]"
-                  >
-                    <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-primary to-tertiary">
-                      <div className="w-full h-full rounded-full border-2 border-surface overflow-hidden flex items-center justify-center bg-surface-container">
-                        <Scan size={24} className="text-primary" />
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-bold text-primary truncate w-16 text-center">Latest</span>
-                  </button>
-                )}
-                {transactions
-                  .filter(t => t.category === 'UPI Payment' || t.upiApp)
-                  .reduce((acc, t) => {
-                    if (!acc.find(x => x.upi === t.merchant || x.upi === t.description.split('to ')[1])) {
-                      const upi = t.description.split('to ')[1] || t.merchant;
-                      acc.push({ 
-                        name: t.merchant.split(' ')[0], 
-                        upi: upi,
-                        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${upi}`
-                      });
-                    }
-                    return acc;
-                  }, [] as { name: string, upi: string, avatar: string }[])
-                  .slice(0, 6)
-                  .map((contact, i) => (
-                    <button 
-                      key={i} 
-                      onClick={() => {
-                        setScannedUPI({ upiId: contact.upi, name: contact.name });
-                        setShowUPIPaymentModal(true);
-                      }}
-                      className="flex flex-col items-center gap-3 active:scale-90 transition-transform min-w-[70px]"
-                    >
-                      <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-primary to-secondary">
-                        <div className="w-full h-full rounded-full border-2 border-surface overflow-hidden">
-                          <img src={contact.avatar} alt={contact.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-bold text-on-surface-variant truncate w-16 text-center">{contact.name}</span>
-                    </button>
-                  ))}
-              </div>
-            </section>
-
-            <section>
-              <div className="flex justify-between items-end mb-4 px-2">
-                <h2 className="font-headline text-2xl font-bold">Ledger</h2>
-                <span className="text-primary text-sm font-bold cursor-pointer" onClick={() => setActiveTab('transactions')}>See All</span>
-              </div>
-              <div className="space-y-2">
-                {filteredTransactions.length > 0 ? (
-                  filteredTransactions.slice(0, 5).map(tx => (
-                    <TransactionItem 
-                      key={tx.id} 
-                      transaction={tx} 
-                      onDelete={handleDeleteTransaction}
-                      currency={profile.currency}
-                    />
-                  ))
-                ) : (
-                  <div className="text-center py-10 text-on-surface-variant text-sm">No transactions for this card</div>
-                )}
-              </div>
-            </section>
-          </div>
+          <HomeView
+            profile={profile}
+            cards={cards}
+            transactions={transactions}
+            budgets={budgets}
+            upiAccounts={upiAccounts}
+            usedUPIApps={usedUPIApps}
+            upiAppBalances={upiAppBalances}
+            activeCardIndex={activeCardIndex}
+            handleSwipe={handleSwipe}
+            displayCards={displayCards}
+            totalBalance={totalBalance}
+            totalIncome={totalIncome}
+            totalExpense={totalExpense}
+            onTabChange={handleTabChange}
+            setShowSmsModal={setShowSmsModal}
+            setShowAddModal={setShowAddModal}
+            setShowManageCardsModal={setShowManageCardsModal}
+            setScannedUPI={setScannedUPI}
+            setShowUPIPaymentModal={setShowUPIPaymentModal}
+            handleDeleteTransaction={handleDeleteTransaction}
+            latestScannedUPI={latestScannedUPI}
+          />
         )}
 
         {activeTab === 'budget' && (
-          <div className="pt-4 animate-none">
-            <AnalyticsView transactions={transactions} profile={profile} budgets={budgets} />
-          </div>
+          <BudgetView
+            transactions={transactions}
+            profile={profile}
+            budgets={budgets}
+            setBudgets={setBudgets}
+            setEditingBudget={setEditingBudget}
+            setShowBudgetModal={setShowBudgetModal}
+          />
         )}
 
         {activeTab === 'upi' && (
@@ -2518,238 +2438,27 @@ export default function App() {
         )}
 
         {activeTab === 'profile' && (
-          <div className="pt-4 animate-none">
-            <h1 className="font-headline text-4xl font-bold mb-8">Settings</h1>
-            
-            <div className="flex flex-col items-center mb-10">
-              <div className="relative group">
-                <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-primary/20 p-1">
-                  <img src={profile.avatar} className="w-full h-full rounded-full object-cover" alt="Profile" referrerPolicy="no-referrer" />
-                </div>
-                <button 
-                  onClick={() => setProfile({...profile, avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${Math.random()}&backgroundColor=ba9eff`})}
-                  className="absolute bottom-0 right-0 bg-primary text-surface p-2 rounded-full shadow-lg active:scale-90 transition-transform"
-                >
-                  <Sparkles size={16} />
-                </button>
-              </div>
-              <h2 className="mt-4 font-headline text-2xl font-bold">{profile.name}</h2>
-              <p className="text-on-surface-variant text-sm">{profile.email}</p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="bg-surface-container-low p-6 rounded-2xl border border-white/5 space-y-6">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-headline font-bold text-sm uppercase tracking-widest text-on-surface-variant">Security</h3>
-                  <button 
-                    onClick={() => setShowPinSettings(true)}
-                    className="flex items-center gap-2 bg-surface-container p-2 px-4 rounded-full border border-white/5 text-xs font-bold"
-                  >
-                    <Lock size={14} className="text-primary" />
-                    CHANGE PIN
-                  </button>
-                </div>
-                
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-2 block">Display Name</label>
-                  <div className="flex gap-2">
-                    <input 
-                      type="text" 
-                      value={profile.name}
-                      onChange={e => setProfile({...profile, name: e.target.value})}
-                      className="flex-1 bg-surface-container rounded-xl p-3 text-sm focus:outline-none border border-white/5"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-2 block">Email Address</label>
-                  <input 
-                    type="email" 
-                    value={profile.email}
-                    onChange={e => setProfile({...profile, email: e.target.value})}
-                    className="w-full bg-surface-container rounded-xl p-3 text-sm focus:outline-none border border-white/5"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-2 block">Currency</label>
-                  <select 
-                    value={profile.currency}
-                    onChange={e => setProfile({...profile, currency: e.target.value})}
-                    className="w-full bg-surface-container rounded-xl p-3 text-sm focus:outline-none border border-white/5 appearance-none"
-                  >
-                    <option value="INR">INR (₹)</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="GBP">GBP (£)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="bg-surface-container-low p-6 rounded-2xl border border-white/5 space-y-4">
-                <h3 className="font-headline font-bold text-sm uppercase tracking-widest text-on-surface-variant">Core Features</h3>
-                
-                <div className="flex justify-between items-center py-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                      {profile.theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-bold">Dark Mode</span>
-                      <span className="text-[10px] text-on-surface-variant capitalize">{profile.theme} Mode Enabled</span>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => setProfile({ ...profile, theme: profile.theme === 'dark' ? 'light' : 'dark' })}
-                    className="w-12 h-6 rounded-full bg-surface-container-high relative transition-colors"
-                  >
-                    <motion.div 
-                      animate={{ x: profile.theme === 'dark' ? 24 : 4 }}
-                      className="absolute top-1 w-4 h-4 rounded-full bg-primary shadow-lg"
-                    />
-                  </button>
-                </div>
-
-                <div className="flex justify-between items-center py-2">
-                  <div className="flex items-center gap-3">
-                    <Scan size={18} className="text-primary" />
-                    <div className="flex flex-col">
-                      <span className="text-sm font-bold">Auto SMS Tracking</span>
-                      <span className="text-[10px] text-on-surface-variant">Automatically log spending from bank SMS</span>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => {
-                      setSmsSyncEnabled(!smsSyncEnabled);
-                    }}
-                    className={cn(
-                      "w-12 h-6 rounded-full transition-colors relative",
-                      smsSyncEnabled ? "bg-primary" : "bg-surface-container-highest"
-                    )}
-                  >
-                    <motion.div 
-                      animate={{ x: smsSyncEnabled ? 24 : 4 }}
-                      transition={QUICK_TRANSITION}
-                      className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-md"
-                    />
-                  </button>
-                </div>
-
-                <button className="w-full flex justify-between items-center py-2 text-sm hover:text-primary transition-colors">
-                  <div className="flex items-center gap-3">
-                    <Settings size={18} />
-                    <span>Preferences</span>
-                  </div>
-                  <ChevronRight size={16} />
-                </button>
-                <button className="w-full flex justify-between items-center py-2 text-sm hover:text-primary transition-colors">
-                  <div className="flex items-center gap-3">
-                    <CreditCard size={18} />
-                    <span>Payment Methods</span>
-                  </div>
-                  <ChevronRight size={16} />
-                </button>
-                <button 
-                  onClick={() => {
-                    if(confirm("Are you sure you want to log out? All local data will be kept.")) {
-                      setIsLocked(true);
-                    }
-                  }}
-                  className="w-full flex justify-between items-center py-2 text-sm text-error hover:text-error/80 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <LogOut size={18} />
-                    <span>Logout</span>
-                  </div>
-                </button>
-              </div>
-            </div>
-          </div>
+          <SettingsView
+            profile={profile}
+            setProfile={setProfile}
+            smsSyncEnabled={smsSyncEnabled}
+            setSmsSyncEnabled={setSmsSyncEnabled}
+            setShowPinSettings={setShowPinSettings}
+            setIsLocked={setIsLocked}
+          />
         )}
 
         {activeTab === 'transactions' && (
-          <div className="pt-4 animate-none">
-            <div className="flex justify-between items-center mb-8">
-              <h1 className="font-headline text-4xl font-bold">Transactions</h1>
-              <div className="flex gap-2">
-                <label className="bg-surface-container p-2 rounded-xl border border-white/5 text-primary cursor-pointer active:scale-90 transition-transform">
-                  <Upload size={20} />
-                  <input type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
-                </label>
-                <button 
-                  onClick={() => {
-                    if(confirm("Clear all transaction history?")) {
-                      setTransactions([]);
-                      setCards(prev => prev.map(c => ({ ...c, balance: 0 })));
-                    }
-                  }}
-                  className="bg-surface-container p-2 rounded-xl border border-white/5 text-error active:scale-90 transition-transform"
-                >
-                  <Trash2 size={20} />
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-4 mb-8">
-              <div className="relative">
-                <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant" size={18} />
-                <input 
-                  type="text" 
-                  placeholder="Search transactions..." 
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full bg-surface-container rounded-2xl py-4 pl-12 pr-4 text-sm focus:outline-none border border-white/5"
-                />
-              </div>
-              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-                {['all', 'income', 'expense'].map(type => (
-                  <button 
-                    key={type}
-                    onClick={() => setFilterType(type as any)}
-                    className={cn(
-                      "px-6 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap",
-                      filterType === type ? "bg-primary text-surface" : "bg-surface-container text-on-surface-variant border border-white/5"
-                    )}
-                  >
-                    {type}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div className="space-y-1">
-                <h3 className="text-[10px] font-headline font-bold text-outline uppercase tracking-[0.2em] px-2 mb-2">History</h3>
-                <div className="space-y-1">
-                  {transactions
-                    .filter(t => {
-                      const matchesSearch = t.merchant.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                          t.category.toLowerCase().includes(searchQuery.toLowerCase());
-                      const matchesType = filterType === 'all' || t.type === filterType;
-                      return matchesSearch && matchesType;
-                    })
-                    .length > 0 ? (
-                    transactions
-                      .filter(t => {
-                        const matchesSearch = t.merchant.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                            t.category.toLowerCase().includes(searchQuery.toLowerCase());
-                        const matchesType = filterType === 'all' || t.type === filterType;
-                        return matchesSearch && matchesType;
-                      })
-                      .map(tx => (
-                        <TransactionItem 
-                          key={tx.id} 
-                          transaction={tx} 
-                          onDelete={handleDeleteTransaction}
-                          currency={profile.currency}
-                        />
-                      ))
-                  ) : (
-                    <div className="text-center py-20 text-on-surface-variant">No transactions found</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          <LedgerView
+            transactions={transactions}
+            setTransactions={setTransactions}
+            cards={cards}
+            setCards={setCards}
+            profile={profile}
+            handleDeleteTransaction={handleDeleteTransaction}
+            handleImportCSV={handleImportCSV}
+            setShowImportModal={setShowImportModal}
+          />
         )}
       </main>
 
@@ -3240,7 +2949,7 @@ export default function App() {
       
       {/* UPI Modals */}
       {showQRScanner && (
-        <QRScanner 
+        <ScanView 
           onScan={handleQRScan} 
           onClose={() => setShowQRScanner(false)} 
         />
