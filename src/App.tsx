@@ -790,8 +790,10 @@ const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClos
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const startScanner = async (mode: "user" | "environment") => {
+    setErrorMessage(null);
     if (scannerRef.current?.isScanning) {
       await scannerRef.current.stop();
     }
@@ -818,12 +820,16 @@ const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClos
         () => {}
       );
       setIsReady(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error starting scanner:", err);
       // If environment fails, try user
       if (mode === "environment") {
         setFacingMode("user");
         startScanner("user");
+      } else {
+        setErrorMessage(
+          "Camera access is not permitted. Please grant Obsidian Ledger permission to use the camera in your Android device's app settings."
+        );
       }
     }
   };
@@ -918,20 +924,43 @@ const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClos
         </div>
 
         {!isReady && (
-          <div className="absolute inset-0 flex items-center justify-center z-50 bg-black">
-            <div className="flex flex-col items-center gap-6">
-              <div className="relative">
-                <motion.div 
-                  animate={{ rotate: 360 }} 
-                  transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
-                  className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full"
-                />
-                <Zap size={24} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary animate-pulse" />
-              </div>
-              <div className="text-center">
-                <p className="text-white font-headline text-lg font-bold">Waking up Camera</p>
-                <p className="text-white/40 text-xs mt-1">Securing your connection...</p>
-              </div>
+          <div className="absolute inset-0 flex items-center justify-center z-50 bg-black p-6">
+            <div className="flex flex-col items-center gap-6 max-w-xs text-center">
+              {errorMessage ? (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center mb-2">
+                    <X size={28} className="text-error" />
+                  </div>
+                  <div>
+                    <p className="text-white font-headline text-lg font-bold">Camera Access Required</p>
+                    <p className="text-white/60 text-xs mt-2 leading-relaxed">{errorMessage}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setErrorMessage(null);
+                      startScanner(facingMode);
+                    }}
+                    className="w-full bg-primary text-surface font-bold py-3 px-6 rounded-2xl active:scale-95 transition-transform mt-2 cursor-pointer"
+                  >
+                    Allow & Retry
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="relative">
+                    <motion.div 
+                      animate={{ rotate: 360 }} 
+                      transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+                      className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full"
+                    />
+                    <Zap size={24} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary animate-pulse" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-white font-headline text-lg font-bold">Waking up Camera</p>
+                    <p className="text-white/40 text-xs mt-1">Securing your connection...</p>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
