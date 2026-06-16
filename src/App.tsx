@@ -87,9 +87,10 @@ import { BudgetView } from './components/BudgetView';
 import { ScanView } from './components/ScanView';
 import { LedgerView } from './components/LedgerView';
 import { SettingsView } from './components/SettingsView';
+import { CategoriesView } from './components/CategoriesView';
 import { TransactionItem, formatCurrency } from './components/TransactionItem';
 import { CardStack } from './components/CardStack';
-import { UPI_APPS, CATEGORY_ICONS, AVAILABLE_BANKS } from './components/constants';
+import { UPI_APPS, CATEGORY_ICONS, AVAILABLE_BANKS, SMOOTH_TRANSITION, QUICK_TRANSITION, NO_DAMPING_TRANSITION, SPRING_CONFIG } from './components/constants';
 import { SwipeableItem } from './components/SwipeableItem';
 
 // --- Constants & Mock Data ---
@@ -114,35 +115,6 @@ const INITIAL_PROFILE: UserProfile = {
   currency: 'INR',
   theme: 'dark'
 };
-
-const AVAILABLE_BANKS: Bank[] = [
-  { id: 'sbi', name: 'State Bank of India', logo: BANK_LOGOS.sbi },
-  { id: 'hdfc', name: 'HDFC Bank', logo: BANK_LOGOS.hdfc },
-  { id: 'icici', name: 'ICICI Bank', logo: BANK_LOGOS.icici },
-  { id: 'axis', name: 'Axis Bank', logo: BANK_LOGOS.axis },
-  { id: 'kotak', name: 'Kotak Mahindra Bank', logo: BANK_LOGOS.kotak },
-];
-
-const CATEGORY_ICONS: Record<string, any> = {
-  Dining: Utensils,
-  Tech: ShoppingBag,
-  Income: ArrowUpRight,
-  Utilities: Zap,
-  Entertainment: Film,
-  Transport: Fuel,
-  Health: Dumbbell,
-  Shopping: ShoppingBag,
-  Food: Utensils,
-  Travel: Plane,
-  Fun: PartyPopper,
-  Study: GraduationCap,
-};
-
-// --- Animation Constants ---
-const SMOOTH_TRANSITION = { type: 'tween' as const, ease: 'easeInOut' as const, duration: 0.3 };
-const QUICK_TRANSITION = { type: 'tween' as const, ease: 'linear' as const, duration: 0.1 };
-const NO_DAMPING_TRANSITION = { type: 'tween' as const, ease: 'easeOut' as const, duration: 0.15 };
-const SPRING_CONFIG = { damping: 25, stiffness: 200 }; // Low damping for sharp feel
 
 // --- Bottom Sheet Component ---
 const BottomSheet = ({ 
@@ -753,7 +725,7 @@ const BottomNavBar = ({ activeTab, onTabChange }: { activeTab: string, onTabChan
   const tabs = [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'budget', label: 'Budget', icon: Wallet },
-    { id: 'scan', label: 'Scan', icon: Scan },
+    { id: 'categories', label: 'Categories', icon: LayoutGrid },
     { id: 'transactions', label: 'Ledger', icon: ReceiptText },
     { id: 'profile', label: 'Settings', icon: Settings },
   ];
@@ -2368,73 +2340,12 @@ export default function App() {
         )}
 
         {activeTab === 'categories' && (
-          <div className="pt-4 animate-none">
-            <div className="flex items-center gap-4 mb-8">
-              {selectedCategory && (
-                <button onClick={() => setSelectedCategory(null)} className="text-primary">
-                  <ChevronLeft size={24} />
-                </button>
-              )}
-              <h1 className="font-headline text-4xl font-bold">
-                {selectedCategory ? selectedCategory : 'Categories'}
-              </h1>
-            </div>
-
-            {!selectedCategory ? (
-              <div className="grid grid-cols-2 gap-2">
-                {Object.keys(CATEGORY_ICONS).map(catName => {
-                  const data = categoryData[catName] || { amount: 0, count: 0 };
-                  const Icon = CATEGORY_ICONS[catName];
-                  const colors = ['primary', 'secondary', 'tertiary', 'error'];
-                  const color = colors[Object.keys(CATEGORY_ICONS).indexOf(catName) % colors.length];
-                  
-                  return (
-                    <SwipeableItem
-                      key={catName}
-                      onDelete={() => {
-                        if(confirm(`Delete category ${catName} and all its transactions?`)) {
-                          setTransactions(prev => prev.filter(t => t.category !== catName));
-                          setBudgets(prev => prev.filter(b => b.category !== catName));
-                        }
-                      }}
-                    >
-                      <div 
-                        onClick={() => setSelectedCategory(catName)}
-                        className="bg-surface-container-low rounded-xl p-5 flex flex-col justify-between aspect-square border border-white/5 relative overflow-hidden group cursor-pointer active:scale-95 transition-transform"
-                      >
-                        <div className={cn("absolute -right-4 -top-4 w-24 h-24 rounded-full blur-2xl opacity-10", `bg-${color}`)}></div>
-                        <div className="flex justify-between items-start z-10">
-                          <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center", `bg-${color}/10 text-${color}`)}>
-                            <Icon size={20} />
-                          </div>
-                          <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">{catName}</span>
-                        </div>
-                        <div className="z-10">
-                          <p className="text-2xl font-headline font-bold">{formatCurrency(data.amount, profile.currency)}</p>
-                          <p className="text-[10px] text-on-surface-variant font-medium">{data.count} Transactions</p>
-                        </div>
-                      </div>
-                    </SwipeableItem>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {transactions.filter(t => t.category === selectedCategory).length > 0 ? (
-                  transactions.filter(t => t.category === selectedCategory).map(tx => (
-                    <TransactionItem 
-                      key={tx.id} 
-                      transaction={tx} 
-                      onDelete={handleDeleteTransaction}
-                      currency={profile.currency}
-                    />
-                  ))
-                ) : (
-                  <div className="text-center py-20 text-on-surface-variant">No transactions in this category</div>
-                )}
-              </div>
-            )}
-          </div>
+          <CategoriesView 
+            transactions={transactions}
+            profile={profile}
+            setTransactions={setTransactions}
+            onTabChange={handleTabChange}
+          />
         )}
 
         {activeTab === 'profile' && (
