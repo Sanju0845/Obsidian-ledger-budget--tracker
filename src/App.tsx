@@ -1728,6 +1728,28 @@ export default function App() {
     localStorage.setItem('obsidian_upi_accounts', JSON.stringify(upiAccounts));
   }, [upiAccounts]);
 
+  // Prompt camera permission on app startup if not yet granted
+  useEffect(() => {
+    const askCameraPermissionOnStartup = async () => {
+      try {
+        if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+          stream.getTracks().forEach(track => track.stop());
+          console.log('Camera permission checking/request completed successfully on launch');
+        }
+      } catch (err) {
+        console.warn('Camera permission request on startup either denied or not supported:', err);
+      }
+    };
+
+    // Ask 1.5 seconds after mounting to avoid interrupting initial rendering
+    const timer = setTimeout(() => {
+      askCameraPermissionOnStartup();
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   // Theme support
   useEffect(() => {
     if (profile.theme === 'light') {
