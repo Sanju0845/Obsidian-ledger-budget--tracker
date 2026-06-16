@@ -799,25 +799,16 @@ const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClos
       await scannerRef.current.stop();
     }
     
-    // Explicitly request stream permission first to force Capacitor/Android permission prompt to trigger
-    try {
-      if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === "function") {
-        const tempStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode } });
-        tempStream.getTracks().forEach(track => track.stop());
-      }
-    } catch (permErr: any) {
-      console.warn("Permission pre-flight check error:", permErr);
-    }
-
     const html5QrCode = scannerRef.current || new Html5Qrcode("reader");
     scannerRef.current = html5QrCode;
 
     try {
       const config = { 
         fps: 25, 
-        aspectRatio: 1.0,
         qrbox: (viewWidth: number, viewHeight: number) => {
-          return { width: viewWidth, height: viewHeight };
+          // Provide a clean, unzoomed scanning window that is proportional
+          const size = Math.min(viewWidth, viewHeight) * 0.72;
+          return { width: size, height: size };
         }
       };
       
@@ -1020,6 +1011,7 @@ const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClos
 };
 
 const UPI_APPS = [
+  { name: 'PhonePe', package: 'com.phonepe.app', icon: 'https://img.icons8.com/?size=48&id=R8eaasv58f5O&format=png' },
   { name: 'Paytm', package: 'net.one97.paytm', icon: 'https://img.icons8.com/?size=48&id=68067&format=png' },
   { name: 'Google Pay', package: 'com.google.android.apps.nbu.paisa.user', icon: 'https://img.icons8.com/?size=48&id=am4ltuIYDpQ5&format=png' },
   { name: 'Airtel', package: 'com.myairtelapp', icon: 'https://cdn.iconscout.com/icon/free/png-512/free-airtel-icon-svg-download-png-14551356.png?f=webp&w=256' },
@@ -1585,43 +1577,64 @@ export default function App() {
       if (scannedUPI) {
         // Generate a unique transaction reference
         const tr = `OB-${Date.now()}`;
-        // Add more standard parameters: mc=0000 (generic), mode=02 (static QR/deep link), orgid=000000
-        const upiUrl = `upi://pay?pa=${scannedUPI.upiId}&pn=${encodeURIComponent(scannedUPI.name || 'Merchant')}&am=${amount}&cu=INR&tn=${encodeURIComponent('Payment via Obsidian')}&tr=${tr}&mc=0000&mode=02&orgid=000000`;
+        // Add more standard parameters
+        const queryParams = `pa=${scannedUPI.upiId}&pn=${encodeURIComponent(scannedUPI.name || 'Merchant')}&am=${amount}&cu=INR&tn=${encodeURIComponent('Payment via Obsidian')}&tr=${tr}&mc=0000&mode=02&orgid=000000`;
+        const upiUrl = `upi://pay?${queryParams}`;
         
+        // Map packages to dedicated direct deep link URL schemes
+        const directSchemes: Record<string, string> = {
+          'com.phonepe.app': `phonepe://pay?${queryParams}`,
+          'net.one97.paytm': `paytmmp://pay?${queryParams}`,
+          'com.google.android.apps.nbu.paisa.user': `tez://upi/pay?${queryParams}`,
+          'in.org.npci.upiapp': `bhim://pay?${queryParams}`
+        };
+
         let link = upiUrl;
         if (appPackage) {
-          // Use Android Intent for specific app targeting
-          // This is more reliable for redirecting to a specific app on Android
-          link = `intent://pay?pa=${scannedUPI.upiId}&pn=${encodeURIComponent(scannedUPI.name || 'Merchant')}&am=${amount}&cu=INR&tn=${encodeURIComponent('Payment via Obsidian')}&tr=${tr}&mc=0000&mode=02&orgid=000000#Intent;scheme=upi;package=${appPackage};end`;
+          if (directSchemes[appPackage]) {
+            link = directSchemes[appPackage];
+          } else {
+            // Intent URL targeting package for general apps on Android
+            link = `intent://pay?${queryParams}#Intent;scheme=upi;package=${appPackage};end`;
+          }
         }
           
-        // Use a more robust redirection method
-        // Creating a hidden link and clicking it can bypass some iframe/browser restrictions
-        const a = document.createElement('a');
-        a.href = link;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        
-        try {
-          // Attempt to open in a new tab if possible, or just click
-          // Some UPI apps respond better to a direct click
-          a.click();
+        if (Capacitor.isNativePlatform()) {
+          console.log("Opening native UPI platform link:", link);
+          // In Capacitor native WebView, standard redirection/clicks are blocked. 
+          // We MUST use window.open with '_system' to delegate the deep-link directly to Android OS.
+          window.open(link, '_system');
+
+          // Fallback after short delay - if specific deep link scheme is not configured on OS, open standard chooser
+          if (appPackage) {
+            setTimeout(() => {
+              window.open(upiUrl, '_system');
+            }, 350);
+          }
+        } else {
+          // Web Preview / Desktop Fallback
+          const a = document.createElement('a');
+          a.href = link;
+          a.style.display = 'none';
+          document.body.appendChild(a);
           
-          // Fallback if click doesn't work
-          setTimeout(() => {
-            if (document.body.contains(a)) {
-              window.location.href = link;
-            }
-          }, 100);
-        } catch (err) {
-          console.error("Redirection failed:", err);
-          window.location.href = link;
-        } finally {
-          setTimeout(() => {
-            if (document.body.contains(a)) {
-              document.body.removeChild(a);
-            }
-          }, 500);
+          try {
+            a.click();
+            setTimeout(() => {
+              if (document.body.contains(a)) {
+                window.location.href = link;
+              }
+            }, 100);
+          } catch (err) {
+            console.error("Redirection failed:", err);
+            window.location.href = link;
+          } finally {
+            setTimeout(() => {
+              if (document.body.contains(a)) {
+                document.body.removeChild(a);
+              }
+            }, 500);
+          }
         }
         
         // Record the transaction
