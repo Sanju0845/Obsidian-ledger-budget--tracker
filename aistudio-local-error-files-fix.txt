@@ -1,0 +1,31 @@
+Looking back at that chaotic streak of red builds on your [GitHub Actions Dashboard](https://github.com/Sanju0845/Obsidian-ledger-budget--tracker/actions), we can categorize the exact trouble-makers into three distinct architectural bottlenecks.
+
+Whenever AI Studio attempted to package or sync changes, it dropped text-based placeholders instead of processing binary file paths. Here is the definitive list of what was causing the trouble:
+
+---
+
+### 1. The Gradle Wrapper Environment (`gradle-wrapper.jar`)
+
+* **The Symptom:** `Error: Invalid or corrupt jarfile ... android/gradle/wrapper/gradle-wrapper.jar`
+* **The Trouble:** Every time a workspace sync was initialized, the pristine execution archive was overwritten by an unformatted, uncompressed **74KB text file**. This broke the pipeline instantly before a single line of Java or Kotlin code could even be read, halting the entire compilation sequence at step zero.
+
+### 2. The Native App Asset Tree (`AAPT2` Graphic Compiler)
+
+* **The Symptom:** `Execution failed for task ':app:mergeReleaseResources' -> AAPT: error: file failed to compile.`
+* **The Trouble:** Android’s asset packaging engine (`AAPT2`) strictly checks the internal structural headers of binary image layouts. The system was crashing on three specific files because they weren't actual images, but empty structural text strings:
+* `android/app/src/main/res/drawable-port-mdpi/splash.png`
+* `android/app/src/main/res/drawable-land-xxxhdpi/splash.png`
+* `android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png`
+
+
+
+### 3. The Application Cryptographic Key (`debug.keystore`)
+
+* **The Symptom:** `Execution failed for task ':app:packageRelease' -> KeytoolException: Failed to read key ... DerInputStream.getLength(): lengthTag=111, too big.`
+* **The Trouble:** This trouble-maker hid at the absolute finish line of your build. After compiling the entire source tree flawlessly, Gradle attempted to sign the raw output binaries into an installable APK package. The `debug.keystore` security file had been flattened into a corrupted string. When Java's `Keytool` parsed it, the stream reader threw a `lengthTag` boundary error because it expected binary encryption blocks but read standard plaintext characters instead.
+
+---
+
+### The Current Safe State
+
+By executing the `--assume-unchanged` index flags locally, you have successfully detached these exact files from Git's tracking engine. Now, your React features in `src/` can move freely through the pipeline without dragging these trouble-makers along for the ride!
