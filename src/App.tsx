@@ -791,6 +791,7 @@ const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClos
   const [isReady, setIsReady] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showManualTrigger, setShowManualTrigger] = useState(false);
 
   const startScanner = async (mode: "user" | "environment") => {
     setErrorMessage(null);
@@ -820,6 +821,7 @@ const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClos
         () => {}
       );
       setIsReady(true);
+      setShowManualTrigger(false);
     } catch (err: any) {
       console.error("Error starting scanner:", err);
       // If environment fails, try user
@@ -836,7 +838,14 @@ const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClos
 
   useEffect(() => {
     startScanner(facingMode);
+
+    const timer = setTimeout(() => {
+      // If the camera is not yet ready or failed, show the fallback activator button
+      setShowManualTrigger(true);
+    }, 1500);
+
     return () => {
+      clearTimeout(timer);
       if (scannerRef.current?.isScanning) {
         scannerRef.current.stop().catch(console.error);
       }
@@ -943,6 +952,27 @@ const QRScanner = ({ onScan, onClose }: { onScan: (data: string) => void, onClos
                     className="w-full bg-primary text-surface font-bold py-3 px-6 rounded-2xl active:scale-95 transition-transform mt-2 cursor-pointer"
                   >
                     Allow & Retry
+                  </button>
+                </>
+              ) : showManualTrigger ? (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-1">
+                    <Zap size={28} className="text-primary animate-bounce" />
+                  </div>
+                  <div>
+                    <p className="text-white font-headline text-lg font-bold">Camera Authentication</p>
+                    <p className="text-white/60 text-xs mt-2 leading-relaxed">
+                      Tap below to authorize camera permissions and scan the QR code.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowManualTrigger(false);
+                      startScanner(facingMode);
+                    }}
+                    className="w-full bg-primary text-surface font-bold py-3 px-6 rounded-2xl active:scale-95 transition-transform mt-3 cursor-pointer"
+                  >
+                    Activate Camera
                   </button>
                 </>
               ) : (
