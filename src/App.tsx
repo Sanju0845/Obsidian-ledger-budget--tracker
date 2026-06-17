@@ -1,84 +1,23 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { motion, AnimatePresence, useAnimation, useDragControls } from 'motion/react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { 
-  Search, 
-  Plus, 
-  Minus,
-  Home, 
-  Wallet, 
-  ReceiptText, 
-  LayoutGrid, 
   Bell, 
+  X, 
+  Smartphone, 
   CreditCard, 
-  ArrowUpRight, 
-  ArrowDownLeft, 
-  ChevronRight,
-  Utensils,
-  ShoppingBag,
-  Zap,
-  Film,
-  Fuel,
-  Dumbbell,
-  X,
-  Scan,
-  PlusCircle,
-  Plane,
-  PartyPopper,
-  Heart,
-  GraduationCap,
-  Sparkles,
-  User,
-  Settings,
-  LogOut,
-  ChevronLeft,
-  Trash2,
-  Edit2,
-  Check,
-  RefreshCw,
-  Smartphone,
-  TrendingUp,
-  TrendingDown,
-  PieChart as PieChartIcon,
-  BarChart3,
-  Calendar,
-  Filter,
-  Download,
-  Upload,
-  Lock,
-  Unlock,
-  Eye,
-  EyeOff,
-  MoreVertical,
-  Target,
-  ArrowRightLeft,
-  Users,
-  HandCoins,
-  Search as SearchIcon,
-  Moon,
-  Sun,
-  Fingerprint,
-  Key
+  Plus, 
+  Settings, 
+  Trash2, 
+  Sparkles, 
+  Wallet,
+  Check, 
+  PlusCircle, 
+  Smartphone as PhoneIcon,
+  CreditCard as CreditCardIcon
 } from 'lucide-react';
-import { 
-  ResponsiveContainer, 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  PieChart, 
-  Pie, 
-  Cell, 
-  BarChart, 
-  Bar,
-  Legend
-} from 'recharts';
 import { cn } from './lib/utils';
-import { Transaction, Card, Budget, UserProfile, Notification, BANK_LOGOS, CARD_COLORS, UPIAccount, Bank } from './types';
+import { Transaction, Card, Budget, UserProfile, Notification, CARD_COLORS, UPIAccount, Bank, BANK_LOGOS } from './types';
 import { GoogleGenAI } from "@google/genai";
-import { Html5Qrcode } from "html5-qrcode";
-import { NativeBiometric } from 'capacitor-native-biometric';
 import { Capacitor } from '@capacitor/core';
 
 // Modular Page components
@@ -89,16 +28,31 @@ import { LedgerView } from './components/LedgerView';
 import { SettingsView } from './components/SettingsView';
 import { CategoriesView } from './components/CategoriesView';
 import homePng from './home.jpeg';
-import { TransactionItem, formatCurrency } from './components/TransactionItem';
-import { CardStack } from './components/CardStack';
-import { UPI_APPS, CATEGORY_ICONS, AVAILABLE_BANKS, SMOOTH_TRANSITION, QUICK_TRANSITION, NO_DAMPING_TRANSITION, SPRING_CONFIG } from './components/constants';
-import { SwipeableItem } from './components/SwipeableItem';
+
+// Imported Extracted Sub-Components
+import { BottomSheet } from './components/BottomSheet';
+import { AppLock } from './components/AppLock';
+import { TopAppBar, BottomNavBar } from './components/Navigation';
+import { UPIPaymentModal } from './components/UPIPaymentModal';
+import { UPIManagement } from './components/UPIManagement';
+import { SplitBillModal, RequestMoneyModal } from './components/TransactionModals';
+import { StatementImporter } from './components/StatementImporter';
+
+// Core Helpers & Constants
+import { formatCurrency } from './components/TransactionItem';
+import { 
+  UPI_APPS, 
+  CATEGORY_ICONS, 
+  AVAILABLE_BANKS, 
+  SMOOTH_TRANSITION, 
+  QUICK_TRANSITION 
+} from './components/constants';
 
 // --- Constants & Mock Data ---
 const INITIAL_CARDS: Card[] = [];
 const INITIAL_TRANSACTIONS: Transaction[] = [];
-
 const INITIAL_UPI_ACCOUNTS: UPIAccount[] = [];
+
 const INITIAL_BUDGETS: Budget[] = [
   { id: '1', category: 'Dining', limit: 0, spent: 0 },
   { id: '2', category: 'Shopping', limit: 0, spent: 0 },
@@ -116,1410 +70,6 @@ const INITIAL_PROFILE: UserProfile = {
   currency: 'INR',
   theme: 'dark'
 };
-
-// --- Bottom Sheet Component ---
-const BottomSheet = ({ 
-  isOpen, 
-  onClose, 
-  title, 
-  children,
-  height = "auto"
-}: { 
-  isOpen: boolean, 
-  onClose: () => void, 
-  title?: string, 
-  children: React.ReactNode,
-  height?: string 
-}) => {
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center">
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }}
-            transition={QUICK_TRANSITION}
-            className="absolute inset-0 bg-black/80 backdrop-blur-md"
-            onClick={onClose}
-          />
-          <motion.div 
-            initial={{ y: '100%' }} 
-            animate={{ y: 0 }} 
-            exit={{ y: '100%' }}
-            transition={SMOOTH_TRANSITION}
-            className="relative w-full max-w-md bg-surface-container-high rounded-t-[32px] p-6 pb-12 shadow-2xl border-t border-white/10 overflow-hidden"
-            style={{ maxHeight: '90vh', height }}
-          >
-            <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-6" />
-            {title && (
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="font-headline text-2xl font-bold">{title}</h3>
-                <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-on-surface-variant">
-                  <X size={20} />
-                </button>
-              </div>
-            )}
-            <div className="overflow-y-auto max-h-[calc(90vh-120px)] no-scrollbar">
-              {children}
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
-  );
-};
-
-// --- App Lock Component ---
-const AppLock = ({ onUnlock, savedPin }: { onUnlock: () => void, savedPin: string }) => {
-  const [pin, setPin] = useState('');
-  const [error, setError] = useState(false);
-  const [biometricSupported, setBiometricSupported] = useState(false);
-  const [biometricError, setBiometricError] = useState('');
-
-  const handleNumber = useCallback((num: string) => {
-    setPin(prev => {
-      if (prev.length < 4) {
-        const newPin = prev + num;
-        if (newPin.length === 4) {
-          if (newPin === savedPin) {
-            onUnlock();
-          } else {
-            setError(true);
-            setTimeout(() => {
-              setPin('');
-              setError(false);
-            }, 500);
-          }
-        }
-        return newPin;
-      }
-      return prev;
-    });
-  }, [savedPin, onUnlock]);
-
-  const triggerBiometricUnlock = useCallback(async () => {
-    if (Capacitor.isNativePlatform()) {
-      try {
-        const available = await NativeBiometric.isAvailable();
-        if (available.isAvailable) {
-          setBiometricSupported(true);
-          await NativeBiometric.verifyIdentity({
-            reason: "Access your Obsidian Budget Tracker securely",
-            title: "Fingerprint Unlock",
-            subtitle: "Scan your fingerprint to continue",
-            description: "Locate your biometric scanner to unlock",
-          });
-          onUnlock();
-        } else {
-          setBiometricSupported(false);
-          console.log("Device does not support biometrics natively.", available.errorCode);
-        }
-      } catch (err: any) {
-        console.error("Native biometric unlock failed:", err);
-        setBiometricError(err?.message || "Biometric unlock failed or dismissed");
-      }
-    } else {
-      // Mock/Simulated Biometrics for Web Previews
-      setBiometricSupported(true);
-      const confirmSim = window.confirm("[WEB PREVIEW] Simulate successful native Fingerprint Unlock?");
-      if (confirmSim) {
-        onUnlock();
-      }
-    }
-  }, [onUnlock]);
-
-  // Keyboard listener to keep entry screen super quick
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key >= '0' && e.key <= '9') {
-        handleNumber(e.key);
-      } else if (e.key === 'Backspace') {
-        setPin(prev => prev.slice(0, -1));
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleNumber]);
-
-  // Prompt native biometrics on mount with short delay
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      triggerBiometricUnlock();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [triggerBiometricUnlock]);
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0 }} 
-      animate={{ opacity: 1 }} 
-      exit={{ opacity: 0 }}
-      transition={SMOOTH_TRANSITION}
-      className="fixed inset-0 z-[200] bg-surface flex flex-col items-center justify-center p-8 select-none"
-    >
-      <div className="mb-12 text-center">
-        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-          <Lock size={32} className="text-primary animate-pulse" />
-        </div>
-        <h1 className="font-headline text-3xl font-bold mb-2">Obsidian Ledger</h1>
-        <p className="text-on-surface-variant text-sm">
-          {biometricSupported ? "Authenticating via Fingerprint / PIN" : "Enter your 4-digit PIN"}
-        </p>
-        {biometricError && (
-          <p className="text-error/80 text-xs mt-2 bg-error/10 py-1 px-3 rounded-full inline-block">
-            {biometricError}
-          </p>
-        )}
-      </div>
-
-      <div className="flex gap-4 mb-16">
-        {[0, 1, 2, 3].map((i) => (
-          <motion.div 
-            key={i}
-            animate={error ? { x: [0, -10, 10, -10, 10, 0] } : {}}
-            transition={QUICK_TRANSITION}
-            className={cn(
-              "w-4 h-4 rounded-full border-2 transition-all duration-300",
-              pin.length > i ? "bg-primary border-primary scale-125 shadow-[0_0_12px_rgba(186,158,255,0.5)]" : "border-white/20"
-            )}
-          />
-        ))}
-      </div>
-
-      <div className="grid grid-cols-3 gap-6 w-full max-w-xs">
-        {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'biometric', '0', 'back'].map((val, i) => (
-          <button
-            key={i}
-            onClick={() => {
-              if (val === 'back') setPin(prev => prev.slice(0, -1));
-              else if (val === 'biometric') triggerBiometricUnlock();
-              else if (val !== '') handleNumber(val);
-            }}
-            className={cn(
-              "w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold transition-all active:scale-95 cursor-pointer touch-manipulation select-none",
-              val === 'biometric' 
-                ? "bg-primary/20 text-primary hover:bg-primary/30 border border-primary/20 shadow-[0_0_15px_rgba(186,158,255,0.2)]" 
-                : val === 'back'
-                ? "bg-surface-container hover:bg-surface-container-high text-on-surface-variant"
-                : "bg-surface-container hover:bg-surface-container-high text-on-surface"
-            )}
-          >
-            {val === 'back' ? <X size={24} /> : val === 'biometric' ? <Fingerprint size={28} className="animate-pulse" /> : val}
-          </button>
-        ))}
-      </div>
-    </motion.div>
-  );
-};
-
-// --- Analytics View Component ---
-const AnalyticsViewOld = ({ transactions, profile, budgets }: { transactions: Transaction[], profile: any, budgets: Budget[] }) => {
-  const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year'>('month');
-
-  const chartData = useMemo(() => {
-    // Group transactions by date
-    const groups: Record<string, { date: string, income: number, expense: number }> = {};
-    const now = new Date();
-    
-    transactions.forEach(t => {
-      const date = new Date(t.date);
-      const key = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      if (!groups[key]) groups[key] = { date: key, income: 0, expense: 0 };
-      if (t.type === 'income') groups[key].income += t.amount;
-      else groups[key].expense += t.amount;
-    });
-
-    return Object.values(groups).slice(-7);
-  }, [transactions]);
-
-  const categoryPieData = useMemo(() => {
-    const data: Record<string, number> = {};
-    transactions.filter(t => t.type === 'expense').forEach(t => {
-      data[t.category] = (data[t.category] || 0) + t.amount;
-    });
-    return Object.entries(data).map(([name, value]) => ({ name, value }));
-  }, [transactions]);
-
-  const COLORS = ['#ba9eff', '#699cff', '#ff86c3', '#ff6e84', '#4ade80', '#fbbf24'];
-
-  return (
-    <div className="space-y-8 pb-32">
-      <div className="flex justify-between items-end">
-        <div>
-          <h1 className="font-headline text-4xl font-bold">Analytics</h1>
-          <p className="text-on-surface-variant text-sm">Review your financial health</p>
-        </div>
-        <div className="flex bg-surface-container rounded-full p-1 border border-white/5">
-          {['week', 'month', 'year'].map(r => (
-            <button 
-              key={r}
-              onClick={() => setTimeRange(r as any)}
-              className={cn(
-                "px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all",
-                timeRange === r ? "bg-primary text-surface" : "text-on-surface-variant"
-              )}
-            >
-              {r}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Main Trend Chart */}
-      <div className="bg-surface-container-low p-6 rounded-[32px] border border-white/5 shadow-xl">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="font-headline font-bold text-lg">Cash Flow</h3>
-          <div className="flex gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-primary" />
-              <span className="text-[10px] uppercase font-bold text-on-surface-variant">Expense</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-secondary" />
-              <span className="text-[10px] uppercase font-bold text-on-surface-variant">Income</span>
-            </div>
-          </div>
-        </div>
-        <div className="h-64 w-full min-h-[256px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData}>
-              <defs>
-                <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ba9eff" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#ba9eff" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#699cff" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#699cff" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-              <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#a1a1a1', fontSize: 10 }} dy={10} />
-              <YAxis hide />
-              <Tooltip 
-                contentStyle={{ backgroundColor: '#1a1a1a', border: 'none', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
-                itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
-              />
-              <Area type="monotone" dataKey="expense" stroke="#ba9eff" strokeWidth={3} fillOpacity={1} fill="url(#colorExpense)" />
-              <Area type="monotone" dataKey="income" stroke="#699cff" strokeWidth={3} fillOpacity={1} fill="url(#colorIncome)" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Category Distribution */}
-        <div className="bg-surface-container-low p-6 rounded-[32px] border border-white/5">
-          <h3 className="font-headline font-bold text-lg mb-6">Spending by Category</h3>
-          <div className="h-64 w-full flex items-center justify-center min-h-[256px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={categoryPieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {categoryPieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#1a1a1a', border: 'none', borderRadius: '16px' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="grid grid-cols-2 gap-2 mt-4">
-            {categoryPieData.map((entry, index) => (
-              <div key={`${entry.name}-${index}`} className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                <span className="text-[10px] font-bold truncate">{entry.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Budget Performance */}
-        <div className="bg-surface-container-low p-6 rounded-[32px] border border-white/5">
-          <h3 className="font-headline font-bold text-lg mb-6">Budget vs Actual</h3>
-          <div className="space-y-4">
-            {budgets.slice(0, 4).map(b => {
-              const spent = transactions
-                .filter(t => t.category === b.category && t.type === 'expense')
-                .reduce((acc, t) => acc + t.amount, 0);
-              const percent = Math.min((spent / b.limit) * 100, 100);
-              return (
-                <div key={b.id} className="space-y-1">
-                  <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest">
-                    <span>{b.category}</span>
-                    <span className={percent > 90 ? "text-error" : "text-primary"}>{percent.toFixed(0)}%</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-surface-container-highest rounded-full overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${percent}%` }}
-                      transition={SMOOTH_TRANSITION}
-                      className={cn("h-full", percent > 90 ? "bg-error" : "bg-primary")}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const SwipeableItemOld = ({ children, onDelete, onEdit, className }: { children: React.ReactNode, onDelete?: () => void, onEdit?: () => void, className?: string, key?: any }) => {
-  const [isOpen, setIsOpen] = useState<string | null>(null);
-  const controls = useAnimation();
-  const isMounted = useRef(true);
-
-  useEffect(() => {
-    isMounted.current = true;
-    return () => { isMounted.current = false; };
-  }, []);
-
-  const handleDragEnd = (_: any, info: any) => {
-    if (info.offset.x < -50) {
-      if (isMounted.current) controls.start({ x: -80, transition: SMOOTH_TRANSITION });
-      setIsOpen('delete');
-    } else if (info.offset.x > 50) {
-      if (isMounted.current) controls.start({ x: 80, transition: SMOOTH_TRANSITION });
-      setIsOpen('edit');
-    } else {
-      if (isMounted.current) controls.start({ x: 0, transition: SMOOTH_TRANSITION });
-      setIsOpen(null);
-    }
-  };
-
-  return (
-    <div className={cn("relative overflow-hidden rounded-xl", className)}>
-      {/* Background Actions */}
-      <div className="absolute inset-0 flex justify-between items-center">
-        <div 
-          onClick={() => {
-            if (onEdit) onEdit();
-            else onDelete?.();
-            controls.start({ x: 0 });
-            setIsOpen(null);
-          }}
-          className={cn(
-            "h-full w-20 flex items-center justify-center cursor-pointer",
-            onEdit ? "bg-primary text-[#39008c]" : "bg-error text-white"
-          )}
-        >
-          {onEdit ? <Edit2 size={20} /> : <Trash2 size={20} />}
-        </div>
-        <div 
-          onClick={() => {
-            onDelete?.();
-            controls.start({ x: 0 });
-            setIsOpen(null);
-          }}
-          className="h-full w-20 bg-error text-white flex items-center justify-center cursor-pointer"
-        >
-          <Trash2 size={20} />
-        </div>
-      </div>
-
-      {/* Foreground Content */}
-      <motion.div
-        drag="x"
-        dragConstraints={{ left: -80, right: 80 }}
-        dragElastic={0.1}
-        animate={controls}
-        onDragEnd={handleDragEnd}
-        whileTap={{ cursor: 'grabbing' }}
-        className="relative z-10"
-      >
-        {children}
-      </motion.div>
-    </div>
-  );
-};
-
-// --- Helpers ---
-const formatCurrencyOld = (amount: number | undefined, currency: string) => {
-  if (amount === undefined || amount === null) return '₹0.00';
-  const symbol = currency === 'INR' ? '₹' : '$';
-  return `${symbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
-
-// --- Components ---
-
-const TopAppBar = ({ profile, onProfileClick, onNotificationsClick, unreadCount }: { profile: UserProfile, onProfileClick: () => void, onNotificationsClick: () => void, unreadCount: number }) => (
-  <header 
-    className="fixed left-0 right-0 w-full flex justify-between px-6 z-50 will-change-transform" 
-    style={{ top: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
-  >
-    <div 
-      onClick={onProfileClick}
-      className="glass-header rounded-full h-12 px-2 flex items-center shadow-[0px_0px_32px_rgba(186,158,255,0.08)] cursor-pointer active:scale-95 transition-transform"
-    >
-      <div className="w-8 h-8 rounded-full overflow-hidden border border-primary/20">
-        <img 
-          alt={profile.name} 
-          className="w-full h-full object-cover" 
-          src={profile.avatar}
-          referrerPolicy="no-referrer"
-        />
-      </div>
-      <span className="ml-3 mr-4 font-headline font-bold text-white text-sm tracking-tight">{profile.name} v2.1.</span>
-    </div>
-    <div className="flex gap-2">
-      <button 
-        onClick={onNotificationsClick}
-        className="glass-header w-12 h-12 rounded-full flex items-center justify-center text-primary transition-transform active:scale-90 relative"
-      >
-        <Bell size={20} />
-        {unreadCount > 0 && (
-          <span className="absolute top-3 right-3 w-2 h-2 bg-error rounded-full border border-surface-container-high" />
-        )}
-      </button>
-    </div>
-  </header>
-);
-
-const CardStackOld = React.memo(({ cards, activeIndex, onSwipe, currency }: { cards: Card[], activeIndex: number, onSwipe: (dir: number) => void, currency: string }) => {
-  return (
-    <section className="relative mb-12 h-64 px-6">
-      <div className="relative h-full w-full max-w-md mx-auto flex items-center justify-center">
-        <AnimatePresence initial={false}>
-          {cards.map((card, idx) => {
-            let relIdx = (idx - activeIndex + cards.length) % cards.length;
-            if (relIdx > 1) return null; // Only show top 2 cards for performance
-
-            return (
-              <motion.div
-                key={card.id}
-                layoutId={card.id}
-                className={cn(
-                  "absolute inset-0 h-52 rounded-2xl p-6 flex flex-col justify-between card-shadow-glow border border-white/10",
-                  "bg-gradient-to-br",
-                  card.color
-                )}
-                initial={false}
-                animate={{ 
-                  scale: 1 - relIdx * 0.05, 
-                  opacity: 1 - relIdx * 0.5,
-                  y: relIdx * -15,
-                  zIndex: cards.length - relIdx,
-                  rotate: relIdx * 1
-                }}
-                transition={{ duration: 0.3 }}
-                exit={{ x: -200, opacity: 0, transition: { duration: 0.2 } }}
-                drag={relIdx === 0 ? "x" : false}
-                dragConstraints={{ left: 0, right: 0 }}
-                onDragEnd={(_, info) => {
-                  if (info.offset.x > 80) onSwipe(-1);
-                  else if (info.offset.x < -80) onSwipe(1);
-                }}
-                style={{ cursor: relIdx === 0 ? 'grab' : 'default' }}
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-3">
-                    {card.type === 'app' ? (
-                      <div className="bg-white p-1 rounded-md h-8 w-8 flex items-center justify-center overflow-hidden">
-                        <img src={card.icon} className="h-full w-full object-contain" alt={card.name} referrerPolicy="no-referrer" />
-                      </div>
-                    ) : BANK_LOGOS[card.bank.toLowerCase().replace(/\s/g, '')] ? (
-                      <div className="bg-white/90 p-1 rounded-md h-8 w-8 flex items-center justify-center overflow-hidden">
-                        <img 
-                          src={BANK_LOGOS[card.bank.toLowerCase().replace(/\s/g, '')]} 
-                          className="h-full w-full object-contain" 
-                          alt={card.bank} 
-                          referrerPolicy="no-referrer" 
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                            (e.target as HTMLImageElement).parentElement!.innerHTML = `<span class="text-[10px] font-bold text-black">${card.bank.charAt(0)}</span>`;
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="bg-white/20 p-1 rounded-md h-8 w-8 flex items-center justify-center overflow-hidden">
-                        <span className="text-[10px] font-bold text-white uppercase">{card.bank.charAt(0)}</span>
-                      </div>
-                    )}
-                    <span className="text-white/60 text-xs font-medium">| {card.name}</span>
-                  </div>
-                  {card.type === 'app' ? <Smartphone className="text-white/80" size={24} /> : <CreditCard className="text-white/80" size={24} />}
-                </div>
-                
-                <div>
-                  <p className="font-headline text-2xl text-white tracking-[0.2em] mb-4">
-                    {card.type === 'app' ? 'UPI APP CARD' : `•••• •••• •••• ${card.last4}`}
-                  </p>
-                  <div className="flex justify-between items-end">
-                    <div>
-                      <p className="text-[10px] uppercase font-label text-white/60 mb-1">Balance</p>
-                      <p className="font-headline text-xl text-white font-bold">{formatCurrency(card.balance, currency)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] uppercase font-label text-white/60">{card.type === 'app' ? 'ACTIVE' : `Exp ${card.expiry}`}</p>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-      </div>
-    </section>
-  );
-});
-
-const TransactionItemOld = ({ transaction, onDelete, currency }: { transaction: Transaction, onDelete?: (id: string) => void, currency: string, key?: React.Key }) => {
-  const upiApp = transaction.upiApp ? UPI_APPS.find(a => a.package === transaction.upiApp) : null;
-  const Icon = CATEGORY_ICONS[transaction.category] || ReceiptText;
-  const isExpense = transaction.type === 'expense';
-
-  const content = (
-    <div className="bg-surface-container-low hover:bg-surface-container p-4 flex items-center transition-colors group relative overflow-hidden">
-      <div className={cn(
-        "w-12 h-12 rounded-lg flex items-center justify-center relative",
-        isExpense ? "bg-error/10 text-error" : "bg-secondary/10 text-secondary"
-      )}>
-        <Icon size={24} />
-        {upiApp && (
-          <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-white rounded-full p-1 border border-white/10 shadow-sm overflow-hidden">
-            <img src={upiApp.icon} alt={upiApp.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-          </div>
-        )}
-      </div>
-      <div className="ml-4 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-bold text-on-surface tracking-tight">{transaction.merchant}</p>
-          {upiApp && <span className="text-[8px] font-bold text-primary px-1.5 py-0.5 bg-primary/10 rounded-full uppercase tracking-tighter">{upiApp.name}</span>}
-        </div>
-        <p className="text-[11px] text-on-surface-variant font-medium">{transaction.category}</p>
-      </div>
-      <div className="text-right flex items-center gap-3">
-        <div>
-          <p className={cn("text-sm font-bold", isExpense ? "text-on-surface" : "text-secondary")}>
-            {isExpense ? '-' : '+'}{formatCurrency(transaction.amount, currency)}
-          </p>
-          <p className="text-[10px] text-outline font-medium">
-            {new Date(transaction.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-
-  if (onDelete) {
-    return (
-      <SwipeableItem onDelete={() => onDelete(transaction.id)} className="mb-2">
-        {content}
-      </SwipeableItem>
-    );
-  }
-
-  return <div className="mb-2 rounded-xl overflow-hidden">{content}</div>;
-};
-
-const BottomNavBar = ({ activeTab, onTabChange }: { activeTab: string, onTabChange: (tab: string) => void }) => {
-  const tabs = [
-    { id: 'home', label: 'Home', icon: Home },
-    { id: 'budget', label: 'Budget', icon: Wallet },
-    { id: 'categories', label: 'Categories', icon: LayoutGrid },
-    { id: 'transactions', label: 'Ledger', icon: ReceiptText },
-    { id: 'profile', label: 'Settings', icon: Settings },
-  ];
-
-  return (
-    <nav className="fixed bottom-0 left-0 w-full z-50 pointer-events-none will-change-transform">
-      {/* Fade background to prevent accidental clicks and add depth */}
-      <div className="absolute inset-x-0 bottom-0 h-32 glass-nav pointer-events-auto" />
-      
-      <div 
-        className="relative flex justify-around items-center px-8 pt-4 pointer-events-none" 
-        style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}
-      >
-        <div className="glass-capsule rounded-full w-full max-w-md h-16 flex justify-around items-center px-4 shadow-2xl pointer-events-auto border border-white/10">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => onTabChange(tab.id)}
-              className={cn(
-                "flex flex-col items-center justify-center transition-all tap-highlight-none relative flex-1",
-                activeTab === tab.id ? "text-primary font-bold" : "text-on-surface-variant hover:text-white"
-              )}
-            >
-              <motion.div
-                animate={activeTab === tab.id ? { scale: 1.1, y: -1 } : { scale: 1, y: 0 }}
-                transition={QUICK_TRANSITION}
-              >
-                <tab.icon size={18} className={cn("mb-1", activeTab === tab.id && "fill-primary/20")} />
-              </motion.div>
-              <span className="text-[10px] font-medium tracking-tight">{tab.label}</span>
-              {activeTab === tab.id && (
-                <motion.div 
-                  layoutId="nav-pill"
-                  className="absolute -bottom-1 w-1 h-1 bg-primary rounded-full"
-                />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-    </nav>
-  );
-};
-
-// --- UPI Components ---
-
-const QRScannerOld = ({ onScan, onClose }: { onScan: (data: string) => void, onClose: () => void }) => {
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  const [isReady, setIsReady] = useState(false);
-  const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [showManualTrigger, setShowManualTrigger] = useState(false);
-
-  const startScanner = async (mode: "user" | "environment") => {
-    setErrorMessage(null);
-    if (scannerRef.current?.isScanning) {
-      await scannerRef.current.stop();
-    }
-    
-    const html5QrCode = scannerRef.current || new Html5Qrcode("reader");
-    scannerRef.current = html5QrCode;
-
-    try {
-      const config = { 
-        fps: 25, 
-        qrbox: (viewWidth: number, viewHeight: number) => {
-          // Provide a clean, unzoomed scanning window that is proportional
-          const size = Math.min(viewWidth, viewHeight) * 0.72;
-          return { width: size, height: size };
-        }
-      };
-      
-      await html5QrCode.start(
-        { facingMode: mode },
-        config,
-        (decodedText) => {
-          onScan(decodedText);
-          html5QrCode.stop().catch(console.error);
-        },
-        () => {}
-      );
-      setIsReady(true);
-      setShowManualTrigger(false);
-    } catch (err: any) {
-      console.error("Error starting scanner:", err);
-      // If environment fails, try user
-      if (mode === "environment") {
-        setFacingMode("user");
-        startScanner("user");
-      } else {
-        setErrorMessage(
-          "Camera access is not permitted. Please grant Obsidian Ledger permission to use the camera in your Android device's app settings."
-        );
-      }
-    }
-  };
-
-  useEffect(() => {
-    startScanner(facingMode);
-
-    const timer = setTimeout(() => {
-      // If the camera is not yet ready or failed, show the fallback activator button
-      setShowManualTrigger(true);
-    }, 1500);
-
-    return () => {
-      clearTimeout(timer);
-      if (scannerRef.current?.isScanning) {
-        scannerRef.current.stop().catch(console.error);
-      }
-    };
-  }, []);
-
-  const toggleCamera = () => {
-    const newMode = facingMode === "environment" ? "user" : "environment";
-    setFacingMode(newMode);
-    startScanner(newMode);
-  };
-
-  return (
-    <div className="fixed inset-0 z-[150] bg-black flex flex-col items-center justify-center overflow-hidden">
-      {/* Top Bar */}
-      <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-50 bg-gradient-to-b from-black/90 to-transparent">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-            <Zap size={20} className="text-primary" />
-          </div>
-          <div>
-            <h2 className="text-white font-headline text-lg font-bold">Scan & Pay</h2>
-            <p className="text-white/40 text-[10px] uppercase tracking-widest font-bold">UPI Secure</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={toggleCamera}
-            className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-xl flex items-center justify-center text-white active:scale-90 transition-all border border-white/10"
-          >
-            <RefreshCw size={20} />
-          </button>
-          <button 
-            onClick={onClose} 
-            className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-xl flex items-center justify-center text-white active:scale-90 transition-all border border-white/10"
-          >
-            <X size={24} />
-          </button>
-        </div>
-      </div>
-
-      {/* Scanner Viewport */}
-      <div className="relative w-full h-full bg-black flex items-center justify-center">
-        <div id="reader" className="w-full h-full" />
-        
-        {/* Custom Pro Overlay */}
-        <div className="absolute inset-0 z-40 pointer-events-none">
-          {/* Darkened Mask */}
-          <div className="absolute inset-0 bg-black/60" style={{ 
-            clipPath: 'polygon(0% 0%, 0% 100%, 100% 100%, 100% 0%, 0% 0%, calc(50% - 140px) calc(50% - 140px), calc(50% + 140px) calc(50% - 140px), calc(50% + 140px) calc(50% + 140px), calc(50% - 140px) calc(50% + 140px), calc(50% - 140px) calc(50% - 140px))' 
-          }} />
-
-          {/* Scan Frame Container */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-[280px] h-[280px] relative">
-              {/* Animated Corners */}
-              <motion.div 
-                animate={{ scale: [1, 1.05, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
-                className="absolute inset-0"
-              >
-                <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-primary rounded-tl-3xl" />
-                <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-primary rounded-tr-3xl" />
-                <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-primary rounded-bl-3xl" />
-                <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-primary rounded-br-3xl" />
-              </motion.div>
-
-              {/* Scanning Laser */}
-              <motion.div 
-                animate={{ 
-                  top: ['5%', '95%', '5%'],
-                  opacity: [0.4, 1, 0.4]
-                }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute left-4 right-4 h-1 bg-primary shadow-[0_0_25px_rgba(186,158,255,1)] z-50 rounded-full"
-              />
-
-              {/* Center Target */}
-              <div className="absolute inset-0 flex items-center justify-center opacity-20">
-                <div className="w-1 h-8 bg-white rounded-full" />
-                <div className="w-8 h-1 bg-white rounded-full absolute" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {!isReady && (
-          <div className="absolute inset-0 flex items-center justify-center z-50 bg-black p-6">
-            <div className="flex flex-col items-center gap-6 max-w-xs text-center">
-              {errorMessage ? (
-                <>
-                  <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center mb-2">
-                    <X size={28} className="text-error" />
-                  </div>
-                  <div>
-                    <p className="text-white font-headline text-lg font-bold">Camera Access Required</p>
-                    <p className="text-white/60 text-xs mt-2 leading-relaxed">{errorMessage}</p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setErrorMessage(null);
-                      startScanner(facingMode);
-                    }}
-                    className="w-full bg-primary text-surface font-bold py-3 px-6 rounded-2xl active:scale-95 transition-transform mt-2 cursor-pointer"
-                  >
-                    Allow & Retry
-                  </button>
-                </>
-              ) : showManualTrigger ? (
-                <>
-                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-1">
-                    <Zap size={28} className="text-primary animate-bounce" />
-                  </div>
-                  <div>
-                    <p className="text-white font-headline text-lg font-bold">Camera Authentication</p>
-                    <p className="text-white/60 text-xs mt-2 leading-relaxed">
-                      Tap below to authorize camera permissions and scan the QR code.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setShowManualTrigger(false);
-                      startScanner(facingMode);
-                    }}
-                    className="w-full bg-primary text-surface font-bold py-3 px-6 rounded-2xl active:scale-95 transition-transform mt-3 cursor-pointer"
-                  >
-                    Activate Camera
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div className="relative">
-                    <motion.div 
-                      animate={{ rotate: 360 }} 
-                      transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
-                      className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full"
-                    />
-                    <Zap size={24} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary animate-pulse" />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-white font-headline text-lg font-bold">Waking up Camera</p>
-                    <p className="text-white/40 text-xs mt-1">Securing your connection...</p>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Bottom Instructions */}
-      <div className="absolute bottom-0 left-0 right-0 p-12 text-center z-50 bg-gradient-to-t from-black/90 to-transparent">
-        <div className="bg-white/10 backdrop-blur-xl border border-white/10 rounded-2xl py-3 px-6 inline-block">
-          <p className="text-white/90 text-sm font-medium flex items-center gap-2">
-            <Sparkles size={16} className="text-primary" />
-            Align QR code to pay instantly
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const UPI_APPS_OLD = [
-  { name: 'PhonePe', package: 'com.phonepe.app', icon: 'https://img.icons8.com/?size=48&id=R8eaasv58f5O&format=png' },
-  { name: 'Paytm', package: 'net.one97.paytm', icon: 'https://img.icons8.com/?size=48&id=68067&format=png' },
-  { name: 'Google Pay', package: 'com.google.android.apps.nbu.paisa.user', icon: 'https://img.icons8.com/?size=48&id=am4ltuIYDpQ5&format=png' },
-  { name: 'Airtel', package: 'com.myairtelapp', icon: 'https://cdn.iconscout.com/icon/free/png-512/free-airtel-icon-svg-download-png-14551356.png?f=webp&w=256' },
-  { name: 'FamPay', package: 'com.fampay.app', icon: 'https://play-lh.googleusercontent.com/0IkegIm8uvzIM3RiVBfj01eSlNa3r5C_GCuExyI57b9_x-qLeV8YR3SVuT8DPPYT_N0=w240-h480-rw' },
-  { name: 'Amazon Pay', package: 'in.amazon.mShop.android.shopping', icon: 'https://play-lh.googleusercontent.com/urVIq3KHpF9hAm7FJpE2I4YlGfqMFpUdb5GMtQcASC1ODbWe1zuQFrF99ZPTELfE8wA=w240-h480-rw' },
-  { name: 'BHIM', package: 'in.org.npci.upiapp', icon: 'https://play-lh.googleusercontent.com/B5cNBA15IxjCT-8UTXEWgiPcGkJ1C07iHKwm2Hbs8xR3PnJvZ0swTag3abdC_Fj5OfnP=w240-h480-rw' },
-  { name: 'Kiwi', package: 'com.go.kiwi', icon: 'https://gokiwi.in/logo.png' },
-];
-
-const UPIPaymentModal = ({ 
-  upiData, 
-  accounts, 
-  cards,
-  usedUPIApps,
-  upiAppBalances,
-  onContinue,
-  onClose,
-  onAddAccount,
-  currency 
-}: { 
-  upiData: { upiId: string, name?: string, amount?: string }, 
-  accounts: UPIAccount[], 
-  cards: Card[],
-  usedUPIApps: string[],
-  upiAppBalances: Record<string, number>,
-  onContinue: (amount: string, accountId: string, appPackage?: string) => void,
-  onClose: () => void,
-  onAddAccount: () => void,
-  currency: string
-}) => {
-  const [amount, setAmount] = useState(upiData.amount || '');
-  const [selectedAccountId, setSelectedAccountId] = useState(accounts.find(a => a.isDefault)?.id || accounts[0]?.id || cards[0]?.id || (usedUPIApps.length > 0 ? usedUPIApps[0] : ''));
-  const [isPaying, setIsPaying] = useState(false);
-  const [activeTab, setActiveTab] = useState<'internal' | 'apps'>('apps');
-
-  const handlePay = (appPackage?: string) => {
-    if (!amount) return;
-    if (!selectedAccountId && activeTab === 'internal') {
-      onAddAccount();
-      return;
-    }
-    
-    // If we're in the internal tab and selected an app package as accountId
-    if (activeTab === 'internal' && usedUPIApps.includes(selectedAccountId)) {
-      onContinue(amount, 'app_wallet', selectedAccountId);
-    } else {
-      onContinue(amount, selectedAccountId || 'direct', appPackage);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="text-center py-2">
-        <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-2">
-          <ArrowUpRight size={28} className="text-primary" />
-        </div>
-        <h3 className="font-headline text-lg font-bold">{upiData.name || 'Paying to'}</h3>
-        <p className="text-on-surface-variant text-xs">{upiData.upiId}</p>
-      </div>
-
-      <div className="space-y-2">
-        <label className="text-[10px] uppercase font-bold text-on-surface-variant tracking-widest ml-1">Amount</label>
-        <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-primary">
-            {currency === 'INR' ? '₹' : '$'}
-          </span>
-          <input 
-            type="number" 
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.00"
-            className="w-full bg-surface-container h-14 rounded-2xl pl-12 pr-4 text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-primary/50"
-          />
-        </div>
-      </div>
-
-      <div className="flex bg-surface-container rounded-full p-1 border border-white/5">
-        <button 
-          onClick={() => setActiveTab('apps')}
-          className={cn(
-            "flex-1 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2",
-            activeTab === 'apps' ? "bg-primary text-surface shadow-lg" : "text-on-surface-variant"
-          )}
-        >
-          <Smartphone size={14} />
-          UPI Apps
-        </button>
-        <button 
-          onClick={() => setActiveTab('internal')}
-          className={cn(
-            "flex-1 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2",
-            activeTab === 'internal' ? "bg-primary text-surface shadow-lg" : "text-on-surface-variant"
-          )}
-        >
-          <Wallet size={14} />
-          Accounts & Cards
-        </button>
-      </div>
-
-      <div className="relative overflow-hidden min-h-[280px]">
-        <AnimatePresence mode="wait">
-          {activeTab === 'apps' ? (
-            <motion.div 
-              key="apps"
-              initial={{ x: 20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: -20, opacity: 0 }}
-              drag="x"
-              dragConstraints={{ left: 0, right: 0 }}
-              onDragEnd={(_, info) => {
-                if (info.offset.x < -50) setActiveTab('internal');
-              }}
-              className="grid grid-cols-2 gap-3"
-            >
-              {UPI_APPS.map(app => (
-                <button 
-                  key={app.package}
-                  disabled={!amount}
-                  onClick={() => handlePay(app.package)}
-                  className={cn(
-                    "p-4 rounded-2xl bg-surface-container border border-white/5 flex flex-col items-center justify-center gap-3 hover:bg-surface-container-high transition-all active:scale-95",
-                    !amount && "opacity-50 grayscale"
-                  )}
-                >
-                  <div className="w-12 h-12 rounded-xl bg-white p-2 flex items-center justify-center overflow-hidden">
-                    <img src={app.icon} alt={app.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-                  </div>
-                  <span className="font-bold text-[10px] uppercase tracking-wider">{app.name}</span>
-                </button>
-              ))}
-            </motion.div>
-          ) : (
-            <motion.div 
-              key="internal"
-              initial={{ x: -20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 20, opacity: 0 }}
-              drag="x"
-              dragConstraints={{ left: 0, right: 0 }}
-              onDragEnd={(_, info) => {
-                if (info.offset.x > 50) setActiveTab('apps');
-              }}
-              className="space-y-2"
-            >
-              <div className="max-h-[200px] overflow-y-auto no-scrollbar space-y-2">
-                {accounts.length === 0 && cards.length === 0 ? (
-                  <button 
-                    onClick={onAddAccount}
-                    className="w-full p-6 rounded-2xl bg-surface-container border border-white/5 flex flex-col items-center justify-center gap-2 text-primary hover:bg-surface-container-high transition-all active:scale-95"
-                  >
-                    <Plus size={24} />
-                    <span className="font-bold text-sm">Link Account or Card</span>
-                  </button>
-                ) : (
-                  <>
-                    {/* UPI Apps as Wallets */}
-                    {usedUPIApps.map(pkg => {
-                      const app = UPI_APPS.find(a => a.package === pkg);
-                      const balance = upiAppBalances[pkg] || 0;
-                      return (
-                        <button 
-                          key={pkg}
-                          onClick={() => setSelectedAccountId(pkg)}
-                          className={cn(
-                            "w-full p-4 rounded-2xl border transition-all flex items-center justify-between",
-                            selectedAccountId === pkg ? "bg-primary/10 border-primary shadow-lg" : "bg-surface-container border-white/5 hover:bg-surface-container-high"
-                          )}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-white/5 p-1.5 flex items-center justify-center">
-                              <img src={app?.icon} alt={app?.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-                            </div>
-                            <div className="text-left">
-                              <p className="font-bold text-sm">{app?.name || 'App Wallet'}</p>
-                              <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest">Wallet / App Balance</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold text-sm">₹{(balance || 0).toLocaleString()}</p>
-                            {selectedAccountId === pkg && <div className="w-2 h-2 rounded-full bg-primary ml-auto mt-1" />}
-                          </div>
-                        </button>
-                      );
-                    })}
-
-                    {accounts.map(acc => (
-                      <button 
-                        key={acc.id}
-                        onClick={() => setSelectedAccountId(acc.id)}
-                        className={cn(
-                          "w-full p-3 rounded-xl border flex items-center justify-between transition-all",
-                          selectedAccountId === acc.id ? "bg-primary/10 border-primary" : "bg-surface-container border-transparent"
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
-                            <Wallet size={16} className="text-primary" />
-                          </div>
-                          <div className="text-left">
-                            <p className="font-bold text-xs">{acc.bankName}</p>
-                            <p className="text-[10px] text-on-surface-variant">{acc.upiId}</p>
-                          </div>
-                        </div>
-                        {selectedAccountId === acc.id && <Check size={14} className="text-primary" />}
-                      </button>
-                    ))}
-                    {cards.map(card => (
-                      <button 
-                        key={card.id}
-                        onClick={() => setSelectedAccountId(card.id)}
-                        className={cn(
-                          "w-full p-3 rounded-xl border flex items-center justify-between transition-all",
-                          selectedAccountId === card.id ? "bg-primary/10 border-primary" : "bg-surface-container border-transparent"
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
-                            <CreditCard size={16} className="text-secondary" />
-                          </div>
-                          <div className="text-left">
-                            <p className="font-bold text-xs">{card.bank}</p>
-                            <p className="text-[10px] text-on-surface-variant">•••• {card.last4}</p>
-                          </div>
-                        </div>
-                        {selectedAccountId === card.id && <Check size={14} className="text-primary" />}
-                      </button>
-                    ))}
-                  </>
-                )}
-              </div>
-              
-              <button 
-                disabled={!amount || isPaying}
-                onClick={() => handlePay()}
-                className={cn(
-                  "w-full h-14 rounded-2xl font-bold text-sm flex items-center justify-center gap-3 transition-all active:scale-95 mt-4",
-                  !amount || isPaying ? "bg-white/5 text-white/20 grayscale" : "bg-primary text-surface shadow-lg"
-                )}
-              >
-                <Zap size={18} />
-                Continue to Payment
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </div>
-  );
-};
-
-const UPIManagement = ({ 
-  accounts, 
-  transactions, 
-  onAdd, 
-  onDelete, 
-  onSetDefault, 
-  currency,
-  usedUPIApps,
-  upiAppBalances,
-  onUpdateAppBalance,
-  onUpdateBalance,
-  onDeleteApp
-}: { 
-  accounts: UPIAccount[], 
-  transactions: Transaction[], 
-  onAdd: () => void, 
-  onDelete: (id: string) => void, 
-  onSetDefault: (id: string) => void, 
-  currency: string,
-  usedUPIApps: string[],
-  upiAppBalances: Record<string, number>,
-  onUpdateAppBalance: (pkg: string, balance: number) => void,
-  onUpdateBalance: (id: string, balance: number) => void,
-  onDeleteApp: (pkg: string) => void
-}) => {
-  const upiTransactions = transactions.filter(t => t.cardId === 'upi').slice(0, 5);
-
-  return (
-    <div className="space-y-8 pb-32">
-      <div>
-        <h1 className="font-headline text-4xl font-bold">UPI Accounts</h1>
-        <p className="text-on-surface-variant text-sm">Manage your linked bank accounts and apps</p>
-      </div>
-
-      <div className="space-y-4">
-        {/* Bank Accounts Section */}
-        <div className="space-y-2">
-          <h2 className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest px-2">Bank Accounts</h2>
-          {accounts.map(acc => (
-            <div key={acc.id} className="bg-surface-container-low p-6 rounded-[32px] border border-white/5 shadow-xl">
-              <div className="flex justify-between items-start mb-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-                    <Wallet size={24} />
-                  </div>
-                  <div>
-                    <h3 className="font-headline font-bold text-lg">{acc.bankName}</h3>
-                    <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest">{acc.upiId}</p>
-                  </div>
-                </div>
-                {acc.isDefault && (
-                  <span className="bg-primary/20 text-primary text-[8px] font-bold px-2 py-1 rounded-full uppercase tracking-widest">Default</span>
-                )}
-              </div>
-
-              <div className="flex justify-between items-end">
-                <div>
-                  <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-1">Balance</p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-xl font-bold">₹{(acc.balance || 0).toLocaleString()}</p>
-                    <button 
-                      onClick={() => {
-                        const newBalance = prompt(`Enter new balance for ${acc.bankName}`, acc.balance.toString());
-                        if (newBalance !== null) {
-                          onUpdateBalance(acc.id, Number(newBalance) || 0);
-                        }
-                      }}
-                      className="p-1 rounded-full bg-white/5 text-on-surface-variant hover:text-primary transition-colors"
-                    >
-                      <Settings size={14} />
-                    </button>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  {!acc.isDefault && (
-                    <button 
-                      onClick={() => onSetDefault(acc.id)}
-                      className="p-2 rounded-full bg-white/5 text-on-surface-variant hover:text-primary transition-colors"
-                    >
-                      <Check size={20} />
-                    </button>
-                  )}
-                  <button 
-                    onClick={() => onDelete(acc.id)}
-                    className="p-2 rounded-full bg-white/5 text-on-surface-variant hover:text-error transition-colors"
-                  >
-                    <Trash2 size={20} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* UPI Apps Section */}
-        {usedUPIApps.length > 0 && (
-          <div className="space-y-2 mt-8">
-            <h2 className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest px-2">UPI Apps & Wallets</h2>
-            {usedUPIApps.map(pkg => {
-              const app = UPI_APPS.find(a => a.package === pkg);
-              const balance = upiAppBalances[pkg] || 0;
-              
-              return (
-                <div key={pkg} className="bg-surface-container-low p-6 rounded-[32px] border border-white/5 shadow-xl">
-                  <div className="flex justify-between items-start mb-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-white/5 p-2 flex items-center justify-center">
-                        <img src={app?.icon} alt={app?.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-                      </div>
-                      <div>
-                        <h3 className="font-headline font-bold text-lg">{app?.name || 'UPI App'}</h3>
-                        <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest">{pkg}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-end">
-                    <div>
-                      <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-1">Balance</p>
-                      <div className="flex items-center gap-2">
-                        <p className="text-xl font-bold">₹{(balance || 0).toLocaleString()}</p>
-                        <button 
-                          onClick={() => {
-                            const newBalance = prompt('Enter new balance for ' + (app?.name || 'App'), balance.toString());
-                            if (newBalance !== null) {
-                              onUpdateAppBalance(pkg, Number(newBalance) || 0);
-                            }
-                          }}
-                          className="p-1 rounded-full bg-white/5 text-on-surface-variant hover:text-primary transition-colors"
-                        >
-                          <Settings size={14} />
-                        </button>
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => onDeleteApp(pkg)}
-                      className="p-2 rounded-full bg-white/5 text-on-surface-variant hover:text-error transition-colors"
-                    >
-                      <Trash2 size={20} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <button 
-          onClick={onAdd}
-          className="w-full h-32 rounded-[32px] border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-2 text-on-surface-variant hover:text-white hover:border-white/20 transition-all"
-        >
-          <Plus size={24} />
-          <span className="font-bold">Link New Bank Account</span>
-        </button>
-      </div>
-
-      {upiTransactions.length > 0 && (
-        <div className="mt-10">
-          <h2 className="font-headline text-2xl font-bold mb-4">Recent UPI Payments</h2>
-          <div className="space-y-2">
-            {upiTransactions.map(tx => (
-              <TransactionItem key={tx.id} transaction={tx} currency={currency} />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const SplitBillModal = ({ onClose }: { onClose: () => void }) => {
-  const [amount, setAmount] = useState('');
-  const [people, setPeople] = useState('2');
-  
-  return (
-    <div className="space-y-6">
-      <div>
-        <label className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-2 block">Total Amount</label>
-        <input 
-          type="number" 
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="0.00"
-          className="w-full bg-surface-container-low border border-white/5 rounded-2xl p-4 text-2xl font-bold focus:border-primary outline-none transition-colors"
-        />
-      </div>
-
-      <div>
-        <label className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-2 block">Number of People</label>
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => setPeople(Math.max(1, parseInt(people) - 1).toString())}
-            className="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center text-primary"
-          >
-            <Minus size={20} />
-          </button>
-          <span className="text-2xl font-bold flex-1 text-center">{people}</span>
-          <button 
-            onClick={() => setPeople((parseInt(people) + 1).toString())}
-            className="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center text-primary"
-          >
-            <Plus size={20} />
-          </button>
-        </div>
-      </div>
-
-      {amount && parseInt(people) > 0 && (
-        <div className="bg-primary/10 p-6 rounded-3xl border border-primary/20">
-          <p className="text-[10px] text-primary uppercase font-bold tracking-widest mb-1">Each Person Pays</p>
-          <p className="text-3xl font-bold text-primary">₹{(parseFloat(amount) / parseInt(people)).toFixed(2)}</p>
-        </div>
-      )}
-
-      <button 
-        onClick={() => {
-          alert(`Requesting ₹${(parseFloat(amount) / parseInt(people)).toFixed(2)} from ${parseInt(people) - 1} people`);
-          onClose();
-        }}
-        className="w-full py-4 bg-primary text-surface font-bold rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-      >
-        Send Split Request
-      </button>
-    </div>
-  );
-};
-
-const RequestMoneyModal = ({ onClose }: { onClose: () => void }) => {
-  const [amount, setAmount] = useState('');
-  const [upiId, setUpiId] = useState('');
-  
-  return (
-    <div className="space-y-6">
-      <div>
-        <label className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-2 block">Amount</label>
-        <input 
-          type="number" 
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="0.00"
-          className="w-full bg-surface-container-low border border-white/5 rounded-2xl p-4 text-2xl font-bold focus:border-primary outline-none transition-colors"
-        />
-      </div>
-
-      <div>
-        <label className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-2 block">Payer UPI ID</label>
-        <input 
-          type="text" 
-          value={upiId}
-          onChange={(e) => setUpiId(e.target.value)}
-          placeholder="example@upi"
-          className="w-full bg-surface-container-low border border-white/5 rounded-2xl p-4 font-bold focus:border-primary outline-none transition-colors"
-        />
-      </div>
-
-      <button 
-        onClick={() => {
-          alert(`Request for ₹${amount} sent to ${upiId}`);
-          onClose();
-        }}
-        className="w-full py-4 bg-primary text-surface font-bold rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-      >
-        Send Request
-      </button>
-    </div>
-  );
-};
-
-// --- Main App ---
 
 export default function App() {
   const [cards, setCards] = useState<Card[]>(() => {
@@ -1557,102 +107,6 @@ export default function App() {
   const [selectedUPIAccount, setSelectedUPIAccount] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
 
-  const handleUPIContinue = (amount: string, accountId: string, appPackage?: string) => {
-    setPaymentAmount(amount);
-    setSelectedUPIAccount(accountId);
-    setShowUPIPaymentModal(false); 
-    
-    // Directly trigger native UPI chooser or specific app after a short delay
-    setTimeout(() => {
-      if (scannedUPI) {
-        // Generate a unique transaction reference
-        const tr = `OB-${Date.now()}`;
-        // Add more standard parameters
-        const queryParams = `pa=${scannedUPI.upiId}&pn=${encodeURIComponent(scannedUPI.name || 'Merchant')}&am=${amount}&cu=INR&tn=${encodeURIComponent('Payment via Obsidian')}&tr=${tr}&mc=0000&mode=02&orgid=000000`;
-        const upiUrl = `upi://pay?${queryParams}`;
-        
-        // Map packages to dedicated direct deep link URL schemes
-        const directSchemes: Record<string, string> = {
-          'com.phonepe.app': `phonepe://pay?${queryParams}`,
-          'net.one97.paytm': `paytmmp://pay?${queryParams}`,
-          'com.google.android.apps.nbu.paisa.user': `tez://upi/pay?${queryParams}`,
-          'in.org.npci.upiapp': `bhim://pay?${queryParams}`
-        };
-
-        let link = upiUrl;
-        if (appPackage) {
-          if (directSchemes[appPackage]) {
-            link = directSchemes[appPackage];
-          } else {
-            // Intent URL targeting package for general apps on Android
-            link = `intent://pay?${queryParams}#Intent;scheme=upi;package=${appPackage};end`;
-          }
-        }
-          
-        if (Capacitor.isNativePlatform()) {
-          console.log("Opening native UPI platform link:", link);
-          // Standard redirection is ideal for unhandled deep-link custom schemes to let OS catch them
-          try {
-            window.location.href = link;
-          } catch (e) {
-            console.error("Native location redirection failed:", e);
-          }
-          
-          // Delegation fallback to assist OS in launching specific schemes if standard intercept fails
-          try {
-            window.open(link, '_system');
-          } catch (e) {
-            console.error("Native system window open failed:", e);
-          }
-
-          // Fallback after short delay - if specific deep link scheme is not configured on OS, open standard chooser
-          if (appPackage) {
-            setTimeout(() => {
-              try {
-                window.location.href = upiUrl;
-              } catch (e) {
-                console.error("Native location upiUrl redirection failed:", e);
-              }
-              try {
-                window.open(upiUrl, '_system');
-              } catch (e) {
-                console.error("Native system upiUrl open failed:", e);
-              }
-            }, 500);
-          }
-        } else {
-          // Web Preview / Desktop Fallback
-          const a = document.createElement('a');
-          a.href = link;
-          a.style.display = 'none';
-          document.body.appendChild(a);
-          
-          try {
-            a.click();
-            setTimeout(() => {
-              if (document.body.contains(a)) {
-                window.location.href = link;
-              }
-            }, 100);
-          } catch (err) {
-            console.error("Redirection failed:", err);
-            window.location.href = link;
-          } finally {
-            setTimeout(() => {
-              if (document.body.contains(a)) {
-                document.body.removeChild(a);
-              }
-            }, 500);
-          }
-        }
-        
-        // Record the transaction
-        handleUPIPay(parseFloat(amount), accountId, appPackage);
-        setScannedUPI(null);
-      }
-    }, 300);
-  };
-
   const [showAddUPIModal, setShowAddUPIModal] = useState(false);
   const [scannedUPI, setScannedUPI] = useState<{ upiId: string, name?: string, amount?: string } | null>(null);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
@@ -1671,10 +125,6 @@ export default function App() {
     const saved = localStorage.getItem('obsidian_upi_app_balances');
     return saved ? JSON.parse(saved) : {};
   });
-
-  useEffect(() => {
-    localStorage.setItem('obsidian_upi_app_balances', JSON.stringify(upiAppBalances));
-  }, [upiAppBalances]);
 
   const [latestScannedUPI, setLatestScannedUPI] = useState<{ upiId: string, name?: string } | null>(() => {
     const saved = localStorage.getItem('obsidian_latest_scanned_upi');
@@ -1697,9 +147,6 @@ export default function App() {
   const [showNotifications, setShowNotifications] = useState(false);
   const unreadNotifications = notifications.filter(n => !n.read).length;
 
-  // Category Detail state
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-
   // Form states
   const [newCard, setNewCard] = useState({ bank: '', name: '', last4: '' });
   const [newTx, setNewTx] = useState({ 
@@ -1712,6 +159,11 @@ export default function App() {
     upiAppName: '',
     bankCardLast4: ''
   });
+
+  const [isLocked, setIsLocked] = useState(true);
+  const [appPin, setAppPin] = useState('1234'); // Default PIN
+  const [showPinSettings, setShowPinSettings] = useState(false);
+  const [newPin, setNewPin] = useState('');
 
   // Persistence
   useEffect(() => {
@@ -1750,6 +202,10 @@ export default function App() {
     localStorage.setItem('obsidian_upi_accounts', JSON.stringify(upiAccounts));
   }, [upiAccounts]);
 
+  useEffect(() => {
+    localStorage.setItem('obsidian_upi_app_balances', JSON.stringify(upiAppBalances));
+  }, [upiAppBalances]);
+
   // Prompt camera permission on app startup if not yet granted
   useEffect(() => {
     const askCameraPermissionOnStartup = async () => {
@@ -1764,7 +220,6 @@ export default function App() {
       }
     };
 
-    // Ask 1.5 seconds after mounting to avoid interrupting initial rendering
     const timer = setTimeout(() => {
       askCameraPermissionOnStartup();
     }, 1500);
@@ -1878,14 +333,8 @@ export default function App() {
     return transactions.filter(t => t.cardId === activeCard.id);
   }, [transactions, activeCard?.id]);
 
-  const [isLocked, setIsLocked] = useState(true);
-  const [appPin, setAppPin] = useState('1234'); // Default PIN
-  const [showPinSettings, setShowPinSettings] = useState(false);
-  const [newPin, setNewPin] = useState('');
-
   // UPI Handlers
   const handleQRScan = useCallback((data: string) => {
-    // UPI QR format: upi://pay?pa=address&pn=name&am=amount&cu=currency&tn=note
     try {
       if (data.startsWith('upi://pay')) {
         const url = new URL(data);
@@ -1901,14 +350,12 @@ export default function App() {
           setShowUPIPaymentModal(true);
         }
       } else {
-        // Handle generic text or other formats
         setLatestScannedUPI({ upiId: data });
         setScannedUPI({ upiId: data });
         setShowQRScanner(false);
         setShowUPIPaymentModal(true);
       }
     } catch (e) {
-      // Fallback for non-URL QR codes
       setLatestScannedUPI({ upiId: data });
       setScannedUPI({ upiId: data });
       setShowQRScanner(false);
@@ -1916,8 +363,90 @@ export default function App() {
     }
   }, []);
 
+  const handleUPIContinue = (amount: string, accountId: string, appPackage?: string) => {
+    setPaymentAmount(amount);
+    setSelectedUPIAccount(accountId);
+    setShowUPIPaymentModal(false); 
+    
+    setTimeout(() => {
+      if (scannedUPI) {
+        const tr = `OB-${Date.now()}`;
+        const queryParams = `pa=${scannedUPI.upiId}&pn=${encodeURIComponent(scannedUPI.name || 'Merchant')}&am=${amount}&cu=INR&tn=${encodeURIComponent('Payment via Obsidian')}&tr=${tr}&mc=0000&mode=02&orgid=000000`;
+        const upiUrl = `upi://pay?${queryParams}`;
+        
+        const directSchemes: Record<string, string> = {
+          'com.phonepe.app': `phonepe://pay?${queryParams}`,
+          'net.one97.paytm': `paytmmp://pay?${queryParams}`,
+          'com.google.android.apps.nbu.paisa.user': `tez://upi/pay?${queryParams}`,
+          'in.org.npci.upiapp': `bhim://pay?${queryParams}`
+        };
+
+        let link = upiUrl;
+        if (appPackage) {
+          if (directSchemes[appPackage]) {
+            link = directSchemes[appPackage];
+          } else {
+            link = `intent://pay?${queryParams}#Intent;scheme=upi;package=${appPackage};end`;
+          }
+        }
+          
+        if (Capacitor.isNativePlatform()) {
+          try {
+            window.location.href = link;
+          } catch (e) {
+            console.error("Native location redirection failed:", e);
+          }
+          try {
+            window.open(link, '_system');
+          } catch (e) {
+            console.error("Native system window open failed:", e);
+          }
+
+          if (appPackage) {
+            setTimeout(() => {
+              try {
+                window.location.href = upiUrl;
+              } catch (e) {
+                console.error("Native location upiUrl redirection failed:", e);
+              }
+              try {
+                window.open(upiUrl, '_system');
+              } catch (e) {
+                console.error("Native system upiUrl open failed:", e);
+              }
+            }, 500);
+          }
+        } else {
+          const a = document.createElement('a');
+          a.href = link;
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          
+          try {
+            a.click();
+            setTimeout(() => {
+              if (document.body.contains(a)) {
+                window.location.href = link;
+              }
+            }, 100);
+          } catch (err) {
+            window.location.href = link;
+          } finally {
+            setTimeout(() => {
+              if (document.body.contains(a)) {
+                document.body.removeChild(a);
+              }
+            }, 500);
+          }
+        }
+        
+        handleUPIPay(parseFloat(amount), accountId, appPackage);
+        setScannedUPI(null);
+      }
+    }, 300);
+  };
+
   const handleUPIPay = (amount: number, accountId: string, appPackage?: string) => {
-    // If it's a specific app wallet payment, deduct from app balance
     if (accountId === 'app_wallet' && appPackage) {
       if (!usedUPIApps.includes(appPackage)) {
         setUsedUPIApps(prev => [...prev, appPackage]);
@@ -1927,22 +456,18 @@ export default function App() {
         return { ...prev, [appPackage]: currentBalance - amount };
       });
     } else if (appPackage) {
-      // Just tracking the app usage if used as gateway
       if (!usedUPIApps.includes(appPackage)) {
         setUsedUPIApps(prev => [...prev, appPackage]);
       }
     }
 
     const account = upiAccounts.find(a => a.id === accountId);
-    
-    // If account exists, deduct balance.
     if (account) {
       setUpiAccounts(prev => prev.map(a => 
         a.id === accountId ? { ...a, balance: a.balance - amount } : a
       ));
     }
 
-    // Add transaction
     const appInfo = UPI_APPS.find(a => a.package === appPackage);
     const newTransaction: Transaction = {
       id: Math.random().toString(36).substr(2, 9),
@@ -1957,7 +482,6 @@ export default function App() {
     };
     setTransactions(prev => [newTransaction, ...prev]);
 
-    // Add notification
     const newNotif: Notification = {
       id: Math.random().toString(36).substr(2, 9),
       title: 'UPI Payment Successful',
@@ -1978,15 +502,12 @@ export default function App() {
       upiId,
       bankName: bank.name,
       accountNumber: `XXXX${Math.floor(1000 + Math.random() * 9000)}`,
-      balance: 10000 + Math.floor(Math.random() * 50000), // Mock balance
+      balance: 10000 + Math.floor(Math.random() * 50000), 
       isDefault: upiAccounts.length === 0
     };
     setUpiAccounts(prev => [...prev, newAccount]);
     setShowAddUPIModal(false);
   };
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
 
   const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1998,7 +519,6 @@ export default function App() {
       const lines = text.split('\n');
       const newTransactions: Transaction[] = [];
       
-      // Simple CSV parsing (Date, Category, Amount, Merchant, Type)
       lines.slice(1).forEach(line => {
         const [date, category, amount, merchant, type] = line.split(',');
         if (date && amount) {
@@ -2009,7 +529,7 @@ export default function App() {
             amount: parseFloat(amount),
             merchant: merchant || 'Unknown',
             type: (type?.trim().toLowerCase() as 'income' | 'expense') || 'expense',
-            cardId: cards[0].id
+            cardId: cards[0]?.id || 'direct'
           });
         }
       });
@@ -2037,26 +557,10 @@ export default function App() {
     transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0),
   [transactions]);
 
-  const categoryData = useMemo(() => {
-    const data: Record<string, { amount: number, count: number }> = {};
-    transactions.filter(t => t.type === 'expense').forEach(t => {
-      if (!data[t.category]) data[t.category] = { amount: 0, count: 0 };
-      data[t.category].amount += t.amount;
-      data[t.category].count += 1;
-    });
-    return data;
-  }, [transactions]);
-
-  const handleSwipe = (dir: number) => {
-    if (displayCards.length === 0) return;
-    setActiveCardIndex((prev) => (prev + dir + displayCards.length) % displayCards.length);
-  };
-
   const handleDeleteTransaction = (id: string) => {
     const tx = transactions.find(t => t.id === id);
     if (!tx) return;
 
-    // Update card balance
     setCards(prev => prev.map(c => {
       if (c.id === tx.cardId) {
         return { ...c, balance: c.balance - (tx.type === 'income' ? tx.amount : -tx.amount) };
@@ -2067,33 +571,19 @@ export default function App() {
     setTransactions(prev => prev.filter(t => t.id !== id));
   };
 
-  const handleDeleteCard = (id: string) => {
-    if (!confirm("Are you sure you want to delete this card and all its transactions?")) return;
-    
-    setTransactions(prev => prev.filter(t => t.cardId !== id));
-    setCards(prev => {
-      const newCards = prev.filter(c => c.id !== id);
-      if (activeCardIndex >= newCards.length) {
-        setActiveCardIndex(Math.max(0, newCards.length - 1));
-      }
-      return newCards;
-    });
-  };
-
   const handleAddTransaction = (txData: any) => {
     const cardId = txData.cardId || activeCard?.id;
     
     const tx: Transaction = { 
       ...txData, 
       id: Math.random().toString(36).substr(2, 9),
-      date: new Date().toISOString(),
+      date: txData.date || new Date().toISOString(),
       cardId: cardId,
       upiApp: txData.upiApp,
       description: txData.bankCardLast4 ? `Paid via ${txData.upiApp} (${txData.bankCardLast4})` : (txData.description || `Manual ${txData.type}`)
     };
     setTransactions([tx, ...transactions]);
     
-    // Update card balance
     setCards(prev => prev.map(c => {
       if (c.id === cardId) {
         return { ...c, balance: c.balance + (tx.type === 'income' ? tx.amount : -tx.amount) };
@@ -2108,7 +598,6 @@ export default function App() {
       return a;
     }));
 
-    // If it's a new UPI app, add it to used apps
     if (txData.upiApp) {
       const app = UPI_APPS.find(a => a.name.toLowerCase() === txData.upiApp.toLowerCase());
       const pkg = app?.package || txData.upiApp.toLowerCase().replace(/\s/g, '.');
@@ -2117,7 +606,6 @@ export default function App() {
       }
     }
 
-    // Add notification
     const newNotif: Notification = {
       id: Math.random().toString(36).substr(2, 9),
       title: tx.type === 'income' ? 'Money Received' : 'Payment Successful',
@@ -2178,7 +666,6 @@ export default function App() {
 
       const result = JSON.parse(response.text.replace(/```json|```/g, '').trim());
       
-      // Find matching card by bank and last4, or just bank, or use active
       let card = cards.find(c => 
         (c.bank.toLowerCase() === result.bank?.toLowerCase() && c.last4 === result.last4) ||
         (c.bank.toLowerCase() === result.bank?.toLowerCase())
@@ -2187,7 +674,6 @@ export default function App() {
       if (!card && activeCard) card = activeCard;
       
       if (!card) {
-        // If no card exists, we might need to create one if we have bank info
         if (result.bank && result.last4) {
           const newCardObj: Card = {
             id: Math.random().toString(36).substr(2, 9),
@@ -2279,7 +765,6 @@ export default function App() {
             className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-1000 transform scale-[1.02]"
             style={{ backgroundImage: `url(${homePng})` }}
           />
-          {/* Backdrop Blur tint layer to make standard text readable & make glassmorphism look ultra-rich */}
           <div className="absolute inset-0 bg-black/55 backdrop-blur-[6px] transition-all duration-700" />
         </div>
       )}
@@ -2292,6 +777,7 @@ export default function App() {
         profile={profile}
         onProfileClick={() => setActiveTab('profile')}
         onNotificationsClick={() => setShowNotifications(true)}
+        onScanClick={() => handleTabChange('scan')}
         unreadCount={unreadNotifications}
       />
 
@@ -2306,7 +792,7 @@ export default function App() {
             usedUPIApps={usedUPIApps}
             upiAppBalances={upiAppBalances}
             activeCardIndex={activeCardIndex}
-            handleSwipe={handleSwipe}
+            setActiveCardIndex={setActiveCardIndex}
             displayCards={displayCards}
             totalBalance={totalBalance}
             totalIncome={totalIncome}
@@ -2492,6 +978,7 @@ export default function App() {
       >
         <div className="space-y-4">
           <button 
+            type="button"
             onClick={() => {
               setShowAddModal(false);
               setShowImportModal(true);
@@ -2534,6 +1021,7 @@ export default function App() {
               <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">Type</label>
               <div className="flex gap-2">
                 <button 
+                  type="button"
                   onClick={() => setNewTx({...newTx, type: 'expense'})}
                   className={cn(
                     "flex-1 py-3 rounded-xl text-xs font-bold transition-all border",
@@ -2543,6 +1031,7 @@ export default function App() {
                   SPENT
                 </button>
                 <button 
+                  type="button"
                   onClick={() => setNewTx({...newTx, type: 'income'})}
                   className={cn(
                     "flex-1 py-3 rounded-xl text-xs font-bold transition-all border",
@@ -2558,7 +1047,7 @@ export default function App() {
               <select 
                 value={newTx.category}
                 onChange={e => setNewTx({...newTx, category: e.target.value})}
-                className="w-full bg-surface-container rounded-xl p-3 text-sm focus:outline-none border border-white/5 appearance-none"
+                className="w-full bg-surface-container rounded-xl p-3 text-sm focus:outline-none border border-white/5 appearance-none font-semibold text-on-surface"
               >
                 {Object.keys(CATEGORY_ICONS).map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
@@ -2579,7 +1068,7 @@ export default function App() {
           </div>
 
           {newTx.isUPIApp ? (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 font-semibold text-on-surface">
               <div>
                 <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">App Name</label>
                 <select 
@@ -2595,7 +1084,7 @@ export default function App() {
                 </select>
               </div>
               <div>
-                <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">Bank Card/ID</label>
+                <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block font-sans text-on-surface-variant">Bank Card/ID</label>
                 <input 
                   type="text" 
                   value={newTx.bankCardLast4}
@@ -2606,9 +1095,9 @@ export default function App() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 gap-4 font-semibold text-on-surface">
               <div>
-                <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">Account/Card</label>
+                <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block font-sans text-on-surface-variant">Account/Card</label>
                 <select 
                   value={newTx.cardId || activeCard?.id}
                   onChange={e => setNewTx({...newTx, cardId: e.target.value})}
@@ -2623,6 +1112,7 @@ export default function App() {
           )}
 
           <button 
+            type="button"
             onClick={() => handleAddTransaction({
               amount: parseFloat(newTx.amount),
               type: newTx.type,
@@ -2641,28 +1131,36 @@ export default function App() {
       </BottomSheet>
 
       {/* PIN Settings Modal */}
-      <BottomSheet 
-        isOpen={showImportModal} 
+      <StatementImporter 
+        isOpen={showImportModal}
         onClose={() => setShowImportModal(false)}
-        title="Magic Import"
-      >
-        <div className="space-y-6">
-          <p className="text-sm text-on-surface-variant">Paste text from your PDF statement or CSV export. Our AI will extract all transactions automatically.</p>
-          <textarea 
-            value={smsText}
-            onChange={e => setSmsText(e.target.value)}
-            placeholder="Paste text here..."
-            className="w-full h-48 bg-surface-container rounded-2xl p-4 text-sm focus:outline-none border border-white/5 resize-none font-mono"
-          />
-          <button 
-            onClick={parsePdfText}
-            disabled={isParsing || !smsText.trim()}
-            className="w-full bg-primary text-surface font-bold py-4 rounded-2xl shadow-lg active:scale-[0.98] transition-transform disabled:opacity-50"
-          >
-            {isParsing ? "Extracting..." : "Extract Transactions"}
-          </button>
-        </div>
-      </BottomSheet>
+        cards={cards}
+        upiAccounts={upiAccounts}
+        profileCurrency={profile.currency}
+        onImportComplete={(approvedTxs, targetCardId) => {
+          approvedTxs.forEach((t: any) => {
+            handleAddTransaction({
+              amount: t.amount,
+              type: t.type,
+              category: t.category,
+              merchant: t.merchant,
+              date: t.date, // Past date kept intact!
+              cardId: targetCardId,
+              description: `AI Statement Import: ${t.originalNarration || t.merchant}`
+            });
+          });
+          
+          const newNotif: Notification = {
+            id: Math.random().toString(36).substr(2, 9),
+            title: 'Bulk Statement Synced',
+            message: `Successfully sync'ed ${approvedTxs.length} entries to your selected cards / wallets.`,
+            time: new Date().toISOString(),
+            read: false,
+            type: 'system'
+          };
+          setNotifications(prev => [newNotif, ...prev]);
+        }}
+      />
 
       <BottomSheet 
         isOpen={showPinSettings} 
@@ -2681,6 +1179,7 @@ export default function App() {
           <div className="grid grid-cols-3 gap-4">
             {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'OK'].map(val => (
               <button
+                type="button"
                 key={val}
                 onClick={() => {
                   if (val === 'C') setNewPin('');
@@ -2695,7 +1194,7 @@ export default function App() {
                     setNewPin(newPin + val);
                   }
                 }}
-                className="h-14 rounded-2xl bg-surface-container hover:bg-surface-container-high font-bold active:scale-95 transition-transform"
+                className="h-14 rounded-2xl bg-surface-container hover:bg-surface-container-high font-bold active:scale-95 transition-transform text-white"
               >
                 {val}
               </button>
@@ -2744,7 +1243,7 @@ export default function App() {
                   <div key={card.id} className={cn("p-4 rounded-2xl border border-white/5 flex items-center justify-between bg-gradient-to-r", card.color)}>
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                        {card.type === 'app' ? <Smartphone size={20} className="text-white" /> : <CreditCard size={20} className="text-white" />}
+                        {card.type === 'app' ? <PhoneIcon size={20} className="text-white" /> : <CreditCardIcon size={20} className="text-white" />}
                       </div>
                       <div>
                         <p className="text-sm font-bold text-white">{card.name}</p>
@@ -2753,6 +1252,7 @@ export default function App() {
                     </div>
                     <div className="flex gap-2">
                       <button 
+                        type="button"
                         onClick={() => {
                           const newBalance = prompt(`Enter new balance for ${card.name}`, card.balance.toString());
                           if (newBalance !== null) {
@@ -2772,6 +1272,7 @@ export default function App() {
                       </button>
                       {card.type !== 'app' && (
                         <button 
+                          type="button"
                           onClick={() => {
                             if (confirm(`Delete ${card.name}?`)) {
                               if (card.type === 'upi') {
@@ -2792,6 +1293,7 @@ export default function App() {
               </div>
 
               <button 
+                type="button"
                 onClick={() => {
                   setShowManageCardsModal(false);
                   setShowAddCardModal(true);
@@ -2811,7 +1313,7 @@ export default function App() {
         {showAddCardModal && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center p-4">
             <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={QUICK_TRANSITION}
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
               onClick={() => setShowAddCardModal(false)}
@@ -2822,11 +1324,11 @@ export default function App() {
               className="relative w-full max-w-md bg-surface-container-high rounded-t-3xl p-8 pb-12 shadow-2xl border-t border-white/10"
             >
               <div className="flex justify-between items-center mb-6">
-                <h3 className="font-headline text-2xl font-bold">Add New Card</h3>
+                <h3 className="font-headline text-2xl font-bold text-white">Add New Card</h3>
                 <button onClick={() => setShowAddCardModal(false)} className="text-on-surface-variant"><X size={24} /></button>
               </div>
               
-              <div className="space-y-4">
+              <div className="space-y-4 text-white font-semibold">
                 <div>
                   <label className="text-[10px] uppercase font-bold text-on-surface-variant mb-1 block">Bank Name</label>
                   <input 
@@ -2866,6 +1368,7 @@ export default function App() {
               </div>
 
               <button 
+                type="button"
                 onClick={handleAddCard}
                 disabled={!newCard.bank || newCard.last4.length !== 4}
                 className="w-full mt-8 bg-primary text-[#39008c] font-bold py-4 rounded-xl disabled:opacity-50"
@@ -2920,6 +1423,7 @@ export default function App() {
           <div className="grid grid-cols-2 gap-4">
             {AVAILABLE_BANKS.map(bank => (
               <button 
+                type="button"
                 key={bank.id}
                 onClick={() => {
                   const upiId = `${profile.name.toLowerCase().replace(/\s/g, '')}@${bank.id}`;
@@ -2930,7 +1434,7 @@ export default function App() {
                 <div className="w-12 h-12 bg-white rounded-xl p-2 flex items-center justify-center overflow-hidden">
                   <img src={bank.logo} alt={bank.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
                 </div>
-                <span className="text-[10px] font-bold text-center leading-tight">{bank.name}</span>
+                <span className="text-[10px] font-bold text-center leading-tight text-white">{bank.name}</span>
               </button>
             ))}
           </div>

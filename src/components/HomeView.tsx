@@ -11,10 +11,11 @@ import {
   Sparkles,
   TrendingUp,
   TrendingDown,
-  LayoutGrid
+  LayoutGrid,
+  Smartphone,
+  Check
 } from 'lucide-react';
-import { Card, Transaction, Budget, UPIAccount, UserProfile } from '../types';
-import { CardStack } from './CardStack';
+import { Card, Transaction, Budget, UPIAccount, UserProfile, BANK_LOGOS } from '../types';
 import { TransactionItem, formatCurrency } from './TransactionItem';
 import { cn } from '../lib/utils';
 
@@ -27,7 +28,7 @@ interface HomeViewProps {
   usedUPIApps: string[];
   upiAppBalances: Record<string, number>;
   activeCardIndex: number;
-  handleSwipe: (dir: number) => void;
+  setActiveCardIndex: (index: number) => void;
   displayCards: Card[];
   totalBalance: number;
   totalIncome: number;
@@ -51,7 +52,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   usedUPIApps,
   upiAppBalances,
   activeCardIndex,
-  handleSwipe,
+  setActiveCardIndex,
   displayCards,
   totalBalance,
   totalIncome,
@@ -120,24 +121,121 @@ export const HomeView: React.FC<HomeViewProps> = ({
         </div>
       </section>
 
-      {/* Credit Cards & wallets slider */}
+      {/* Credit Cards & Wallets List (Tappable Carousel instead of Swiping Deck) */}
       <section className="space-y-4">
         <div className="flex justify-between items-center px-2">
           <h2 className="font-headline text-2xl font-bold tracking-tight text-white">Cards & Accounts</h2>
-          <span className="text-xs font-semibold text-primary uppercase tracking-wider">Swipe cards</span>
+          <span className="text-xs font-semibold text-primary uppercase tracking-wider">Tap to select account</span>
         </div>
+        
         {displayCards.length > 0 ? (
-          <CardStack cards={displayCards} activeIndex={activeCardIndex} onSwipe={handleSwipe} currency={profile.currency} />
+          <div className="flex gap-4 overflow-x-auto pb-4 pt-1 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+            {displayCards.map((card, idx) => {
+              const isSelected = activeCardIndex === idx;
+              return (
+                <button
+                  key={card.id || idx}
+                  onClick={() => setActiveCardIndex(idx)}
+                  className={cn(
+                    "relative w-72 h-44 rounded-3xl p-5 flex flex-col justify-between transition-all duration-300 flex-shrink-0 text-left snap-start border active:scale-95 cursor-pointer shadow-lg",
+                    "bg-gradient-to-br",
+                    card.color,
+                    isSelected 
+                      ? "scale-[1.02] border-primary ring-2 ring-primary/40 shadow-[0_8px_30px_rgba(186,158,255,0.3)] opacity-100" 
+                      : "border-white/5 opacity-70 hover:opacity-90"
+                  )}
+                >
+                  <div className="flex justify-between items-start w-full">
+                    <div className="flex items-center gap-2.5">
+                      {card.type === 'app' ? (
+                        <div className="bg-white p-1 rounded-lg h-7 w-7 flex items-center justify-center overflow-hidden">
+                          <img src={card.icon} className="h-full w-full object-contain" alt={card.name} referrerPolicy="no-referrer" />
+                        </div>
+                      ) : BANK_LOGOS[card.bank?.toLowerCase()?.replace(/\s/g, '')] ? (
+                        <div className="bg-white/90 p-1 rounded-lg h-7 w-7 flex items-center justify-center overflow-hidden">
+                          <img 
+                            src={BANK_LOGOS[card.bank.toLowerCase().replace(/\s/g, '')]} 
+                            className="h-full w-full object-contain" 
+                            alt={card.bank} 
+                            referrerPolicy="no-referrer" 
+                          />
+                        </div>
+                      ) : (
+                        <div className="bg-white/20 p-1 rounded-lg h-7 w-7 flex items-center justify-center overflow-hidden text-center">
+                          <span className="text-[10px] font-bold text-white uppercase">{card.bank?.charAt(0) || 'B'}</span>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-white font-bold text-xs leading-none">{card.name}</p>
+                        <p className="text-[9px] text-white/60 leading-none mt-1">{card.bank}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-1.5">
+                      {isSelected && (
+                        <span className="flex items-center justify-center bg-white text-emerald-600 rounded-full w-4 h-4 shadow-sm animate-fade-in">
+                          <Check size={10} strokeWidth={3} />
+                        </span>
+                      )}
+                      {card.type === 'app' ? <Smartphone className="text-white/80" size={16} /> : <CreditCard className="text-white/80" size={16} />}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="font-headline text-lg text-white tracking-[0.15em] mb-3.5 leading-none font-medium">
+                      {card.type === 'app' ? 'UPI WALLET' : `•••• •••• •••• ${card.last4}`}
+                    </p>
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <p className="text-[9px] uppercase font-bold text-white/50 tracking-widest leading-none mb-1">Balance</p>
+                        <p className="font-headline text-xl text-white font-bold tracking-tight leading-none">
+                          {formatCurrency(card.balance, profile.currency)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[9px] font-bold bg-white/10 px-2 py-0.5 rounded-full text-white tracking-widest uppercase">
+                          {card.type === 'app' ? 'UPI' : `Exp ${card.expiry}`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         ) : (
           <div 
             onClick={() => onTabChange('upi')}
-            className="h-52 rounded-3xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-3 text-on-surface-variant hover:text-white hover:border-white/20 transition-all cursor-pointer bg-surface-container-low"
+            className="h-44 rounded-3xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-3 text-on-surface-variant hover:text-white hover:border-white/20 transition-all cursor-pointer bg-surface-container-low"
           >
             <Plus size={32} className="text-primary animate-pulse" />
             <p className="font-headline text-sm font-bold">Link accounts or app wallets</p>
           </div>
         )}
       </section>
+
+      {/* Prominent Scan & Pay Banner */}
+      <button 
+        onClick={() => onTabChange('scan')}
+        className="w-full relative overflow-hidden rounded-[32px] p-6 bg-gradient-to-r from-primary via-indigo-600 to-purple-600 text-left border border-primary/30 shadow-[0_8px_32px_rgba(186,158,255,0.25)] group active:scale-[0.98] transition-all"
+      >
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-48 h-48 rounded-full bg-white/10 blur-[40px] pointer-events-none group-hover:scale-110 transition-transform duration-500" />
+        <div className="absolute right-8 top-1/2 -translate-y-1/2 text-white/20 group-hover:rotate-12 group-hover:scale-110 transition-transform duration-300">
+          <Scan size={56} strokeWidth={1.5} />
+        </div>
+        
+        <div className="relative z-10 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-inner group-hover:animate-pulse">
+            <Scan size={22} className="animate-none" />
+          </div>
+          <div>
+            <h3 className="font-headline font-black text-white text-lg tracking-wide uppercase leading-none">Scan to Pay</h3>
+            <p className="text-white/80 font-semibold text-[11px] uppercase tracking-wider mt-1.5 flex items-center gap-1">
+              <Sparkles size={11} className="text-amber-300 fill-amber-300" /> Use Any UPI QR Code
+            </p>
+          </div>
+        </div>
+      </button>
 
       {/* Bento Grid Action Keys */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -234,6 +332,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 });
               }
               return acc;
+              // Limit contact counts
             }, [] as { name: string, upi: string, avatar: string }[])
             .slice(0, 6)
             .map((contact, i) => (
