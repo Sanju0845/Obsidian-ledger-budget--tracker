@@ -81,7 +81,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 bg-white/5 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/10">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Active Vault</span>
+              <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Active Balance</span>
             </div>
             <span className="text-[10px] text-primary font-bold uppercase tracking-wider bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
               {profile.currency} Balance
@@ -89,7 +89,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </div>
 
           <div className="space-y-1">
-            <p className="text-on-surface-variant font-medium text-xs uppercase tracking-widest pl-1">Total Net Liquidity</p>
+            <p className="text-on-surface-variant font-medium text-xs uppercase tracking-widest pl-1">Total Liquidity</p>
             <h1 className="font-headline text-5xl md:text-6xl font-bold mt-1 tracking-tight text-white drop-shadow-[0_4px_12px_rgba(255,255,255,0.05)]">
               {formatCurrency(totalBalance, profile.currency)}
             </h1>
@@ -121,10 +121,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
       </section>
 
       {/* Credit Cards & wallets slider */}
-      <section className="space-y-3">
+      <section className="space-y-4">
         <div className="flex justify-between items-center px-2">
-          <h2 className="font-headline text-lg font-bold tracking-tight">Vault Enclosures</h2>
-          <span className="text-[11px] font-semibold text-primary uppercase tracking-wider">Swipe cards</span>
+          <h2 className="font-headline text-2xl font-bold tracking-tight text-white">Cards & Accounts</h2>
+          <span className="text-xs font-semibold text-primary uppercase tracking-wider">Swipe cards</span>
         </div>
         {displayCards.length > 0 ? (
           <CardStack cards={displayCards} activeIndex={activeCardIndex} onSwipe={handleSwipe} currency={profile.currency} />
@@ -152,7 +152,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             <Wallet size={18} />
           </div>
           <span className="block font-headline text-xs font-bold text-white uppercase tracking-wider">UPI Accounts</span>
-          <span className="text-[9px] font-bold text-primary tracking-wide">Manage bindings</span>
+          <span className="text-[9px] font-bold text-primary tracking-wide">Manage Accounts</span>
         </button>
 
         <button 
@@ -166,7 +166,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             <Upload size={18} />
           </div>
           <span className="block font-headline text-xs font-bold text-white uppercase tracking-wider">Sync SMS</span>
-          <span className="text-[9px] font-bold text-on-surface-variant tracking-wide">OCR Text Parse</span>
+          <span className="text-[9px] font-bold text-on-surface-variant tracking-wide">AI Parse</span>
         </button>
 
         <button 
@@ -179,8 +179,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <div className="w-10 h-10 rounded-xl bg-tertiary/10 flex items-center justify-center text-tertiary mb-3">
             <PlusCircle size={18} />
           </div>
-          <span className="block font-headline text-xs font-bold text-white uppercase tracking-wider">Add Logs</span>
-          <span className="text-[9px] font-bold text-on-surface-variant tracking-wide">Manual tx entry</span>
+          <span className="block font-headline text-xs font-bold text-white uppercase tracking-wider">Add Tx</span>
+          <span className="text-[9px] font-bold text-on-surface-variant tracking-wide">Manual entry</span>
         </button>
 
         <button 
@@ -194,15 +194,15 @@ export const HomeView: React.FC<HomeViewProps> = ({
             <CreditCard size={18} />
           </div>
           <span className="block font-headline text-xs font-bold text-white uppercase tracking-wider">Manage Cards</span>
-          <span className="text-[9px] font-bold text-on-surface-variant tracking-wide">Card parameters</span>
+          <span className="text-[9px] font-bold text-on-surface-variant tracking-wide">Settings</span>
         </button>
       </section>
 
       {/* Quick Transfer Contacts Section */}
       <section className="space-y-4">
         <div className="flex justify-between items-end px-2">
-          <h2 className="font-headline text-lg font-bold tracking-tight">Expedited Transfers</h2>
-          <span className="text-xs text-primary font-bold cursor-pointer hover:underline" onClick={() => onTabChange('transactions')}>History list</span>
+          <h2 className="font-headline text-2xl font-bold tracking-tight text-white border-none">Quick Transfer</h2>
+          <span className="text-xs text-primary font-bold cursor-pointer hover:underline" onClick={() => onTabChange('transactions')}>See All</span>
         </div>
         <div className="flex gap-4 overflow-x-auto no-scrollbar pb-3">
           {latestScannedUPI && (
@@ -259,12 +259,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
       {/* Mini Ledger Preview on Homescreen */}
       <section className="space-y-4">
         <div className="flex justify-between items-center px-2">
-          <h2 className="font-headline text-lg font-bold tracking-tight">Ledger Stream</h2>
+          <h2 className="font-headline text-2xl font-bold tracking-tight text-white border-none">Ledger</h2>
           <span 
             className="text-xs text-primary font-bold cursor-pointer hover:underline" 
             onClick={() => onTabChange('transactions')}
           >
-            See all ledgers
+            See All
           </span>
         </div>
         <div className="space-y-1.5 rounded-3xl overflow-hidden border border-white/10 bg-white/[0.03] backdrop-blur-xl p-2.5">
@@ -278,8 +278,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
               />
             ))
           ) : (
-            <div className="text-center py-10 text-on-surface-variant text-xs font-semibold">
-              No transactions linked to this card
+            <div className="text-center py-12 text-on-surface-variant text-sm font-semibold">
+              No transactions for this card
             </div>
           )}
         </div>
