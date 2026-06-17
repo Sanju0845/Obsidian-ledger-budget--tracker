@@ -254,14 +254,20 @@ const AppLock = ({ onUnlock, savedPin }: { onUnlock: () => void, savedPin: strin
       initial={{ opacity: 0 }} 
       animate={{ opacity: 1 }} 
       exit={{ opacity: 0 }}
-      transition={SMOOTH_TRANSITION}
-      className="fixed inset-0 z-[200] bg-surface flex flex-col items-center justify-center p-8 select-none"
+      transition={{ duration: 0.15 }}
+      className="fixed inset-0 z-[200] bg-surface flex flex-col justify-between select-none"
+      style={{
+        paddingTop: 'calc(2rem + env(safe-area-inset-top, 24px))',
+        paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 24px))',
+        paddingLeft: '2rem',
+        paddingRight: '2rem'
+      }}
     >
-      <div className="mb-12 text-center">
-        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-          <Lock size={32} className="text-primary animate-pulse" />
+      <div className="text-center w-full mt-2">
+        <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Lock size={28} className="text-primary animate-pulse" />
         </div>
-        <h1 className="font-headline text-3xl font-bold mb-2">Obsidian Ledger</h1>
+        <h1 className="font-headline text-3xl font-bold mb-1.5 tracking-tight">Obsidian Ledger</h1>
         <p className="text-on-surface-variant text-sm">
           {biometricSupported ? "Authenticating via Fingerprint / PIN" : "Enter your 4-digit PIN"}
         </p>
@@ -272,41 +278,59 @@ const AppLock = ({ onUnlock, savedPin }: { onUnlock: () => void, savedPin: strin
         )}
       </div>
 
-      <div className="flex gap-4 mb-16">
-        {[0, 1, 2, 3].map((i) => (
-          <motion.div 
-            key={i}
-            animate={error ? { x: [0, -10, 10, -10, 10, 0] } : {}}
-            transition={QUICK_TRANSITION}
-            className={cn(
-              "w-4 h-4 rounded-full border-2 transition-all duration-300",
-              pin.length > i ? "bg-primary border-primary scale-125 shadow-[0_0_12px_rgba(186,158,255,0.5)]" : "border-white/20"
-            )}
-          />
-        ))}
-      </div>
+      <div className="w-full flex flex-col items-center justify-end mb-4">
+        {/* PIN Indicators */}
+        <div className="flex gap-4 mb-8">
+          {[0, 1, 2, 3].map((i) => (
+            <motion.div 
+              key={i}
+              animate={error ? { x: [0, -10, 10, -10, 10, 0] } : {}}
+              transition={QUICK_TRANSITION}
+              className={cn(
+                "w-3.5 h-3.5 rounded-full border-2 transition-all duration-200 transform-gpu",
+                pin.length > i ? "bg-primary border-primary scale-110 shadow-[0_0_12px_rgba(186,158,255,0.5)]" : "border-white/20"
+              )}
+            />
+          ))}
+        </div>
 
-      <div className="grid grid-cols-3 gap-6 w-full max-w-xs">
-        {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'biometric', '0', 'back'].map((val, i) => (
-          <button
-            key={i}
-            onClick={() => {
+        {/* Numeric Keypad */}
+        <div className="grid grid-cols-3 gap-y-4 gap-x-6 w-full max-w-[270px]">
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'biometric', '0', 'back'].map((val, i) => {
+            const handlePress = () => {
               if (val === 'back') setPin(prev => prev.slice(0, -1));
               else if (val === 'biometric') triggerBiometricUnlock();
               else if (val !== '') handleNumber(val);
-            }}
-            className={cn(
-              "w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold transition-all active:scale-95 cursor-pointer touch-manipulation select-none",
-              val === 'biometric' 
-                ? "bg-primary/20 text-primary hover:bg-primary/30 border border-primary/20 shadow-[0_0_15px_rgba(186,158,255,0.2)]" 
-                : val === 'back'
-                ? "bg-surface-container hover:bg-surface-container-high text-on-surface-variant"
-                : "bg-surface-container hover:bg-surface-container-high text-on-surface"
-            )}
-          >
-            {val === 'back' ? <X size={24} /> : val === 'biometric' ? <Fingerprint size={28} className="animate-pulse" /> : val}
-          </button>
-        ))}
+            };
+
+            const handleButtonTouch = (e: React.TouchEvent) => {
+              e.preventDefault();
+              handlePress();
+            };
+
+            return (
+              <button
+                key={i}
+                onTouchStart={handleButtonTouch}
+                onClick={(e) => {
+                  if (e.defaultPrevented) return;
+                  handlePress();
+                }}
+                className={cn(
+                  "w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold transition-all active:scale-90 cursor-pointer touch-manipulation select-none",
+                  "will-change-transform transform-gpu",
+                  val === 'biometric' 
+                    ? "bg-primary/20 text-primary active:bg-primary/30 border border-primary/20 shadow-[0_0_15px_rgba(186,158,255,0.2)]" 
+                    : val === 'back'
+                    ? "bg-surface-container active:bg-surface-container-high text-on-surface-variant"
+                    : "bg-surface-container active:bg-surface-container-high text-on-surface"
+                )}
+              >
+                {val === 'back' ? <X size={24} /> : val === 'biometric' ? <Fingerprint size={28} className="animate-pulse" /> : val}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </motion.div>
   );
@@ -555,7 +579,10 @@ const formatCurrencyOld = (amount: number | undefined, currency: string) => {
 // --- Components ---
 
 const TopAppBar = ({ profile, onProfileClick, onNotificationsClick, unreadCount }: { profile: UserProfile, onProfileClick: () => void, onNotificationsClick: () => void, unreadCount: number }) => (
-  <header className="fixed top-4 left-0 right-0 w-full flex justify-between px-6 z-50 will-change-transform">
+  <header 
+    className="fixed left-0 right-0 w-full flex justify-between px-6 z-50 will-change-transform"
+    style={{ top: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
+  >
     <div 
       onClick={onProfileClick}
       className="glass-header rounded-full h-12 px-2 flex items-center shadow-[0px_0px_32px_rgba(186,158,255,0.08)] cursor-pointer active:scale-95 transition-transform"
@@ -733,9 +760,15 @@ const BottomNavBar = ({ activeTab, onTabChange }: { activeTab: string, onTabChan
   return (
     <nav className="fixed bottom-0 left-0 w-full z-50 pointer-events-none will-change-transform">
       {/* Fade background to prevent accidental clicks and add depth */}
-      <div className="absolute inset-x-0 bottom-0 h-32 glass-nav pointer-events-auto" />
+      <div 
+        className="absolute inset-x-0 bottom-0 glass-nav pointer-events-auto" 
+        style={{ height: 'calc(8rem + env(safe-area-inset-bottom, 0px))' }}
+      />
       
-      <div className="relative flex justify-around items-center px-8 pb-10 pt-4 pointer-events-none">
+      <div 
+        className="relative flex justify-around items-center px-8 pt-4 pointer-events-none"
+        style={{ paddingBottom: 'calc(2.5rem + env(safe-area-inset-bottom, 0px))' }}
+      >
         <div className="glass-capsule rounded-full w-full max-w-md h-16 flex justify-around items-center px-4 shadow-2xl pointer-events-auto border border-white/10">
           {tabs.map((tab) => (
             <button
@@ -1107,6 +1140,7 @@ const UPIPaymentModal = ({
               onDragEnd={(_, info) => {
                 if (info.offset.x < -50) setActiveTab('internal');
               }}
+              style={{ willChange: 'transform', touchAction: 'pan-y' }}
               className="grid grid-cols-2 gap-3"
             >
               {UPI_APPS.map(app => (
@@ -1137,6 +1171,7 @@ const UPIPaymentModal = ({
               onDragEnd={(_, info) => {
                 if (info.offset.x > 50) setActiveTab('apps');
               }}
+              style={{ willChange: 'transform', touchAction: 'pan-y' }}
               className="space-y-2"
             >
               <div className="max-h-[200px] overflow-y-auto no-scrollbar space-y-2">
@@ -1786,18 +1821,57 @@ export default function App() {
     }
   }, [profile.theme]);
 
-  // Back button handling
+  // Back button & Modal deep-linking navigation synchronizer for Native Capacitor & Mobile Web
+  const anyModalOpen = 
+    showAddModal || 
+    showManageCardsModal || 
+    showAddCardModal || 
+    showSmsModal || 
+    showImportModal || 
+    showBudgetModal || 
+    showSplitModal || 
+    showRequestModal || 
+    showQRScanner || 
+    showUPIPaymentModal || 
+    showAddUPIModal;
+
+  const [modalStatePushed, setModalStatePushed] = useState(false);
+
+  useEffect(() => {
+    // Ensure baseline history exists so Android native exit operates ONLY on initial root screens
+    if (window.history.state === null) {
+      window.history.replaceState({ tab: 'home' }, '', '#home');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (anyModalOpen && !modalStatePushed) {
+      window.history.pushState({ modal: true }, '', '#modal-open');
+      setModalStatePushed(true);
+    } else if (!anyModalOpen && modalStatePushed) {
+      if (window.history.state && window.history.state.modal) {
+        window.history.back();
+      }
+      setModalStatePushed(false);
+    }
+  }, [anyModalOpen, modalStatePushed]);
+
   useEffect(() => {
     const handlePopState = (e: PopStateEvent) => {
-      if (showQRScanner) {
-        setShowQRScanner(false);
-        return;
-      }
-      if (showUPIPaymentModal) {
-        setShowUPIPaymentModal(false);
-        setScannedUPI(null);
-        return;
-      }
+      // Dismiss all overlays, sliders, and modal sheets when hardware back is activated
+      setShowAddModal(false);
+      setShowManageCardsModal(false);
+      setShowAddCardModal(false);
+      setShowSmsModal(false);
+      setShowImportModal(false);
+      setShowBudgetModal(false);
+      setShowSplitModal(false);
+      setShowRequestModal(false);
+      setShowQRScanner(false);
+      setShowUPIPaymentModal(false);
+      setShowAddUPIModal(false);
+      setModalStatePushed(false);
+
       if (e.state && e.state.tab) {
         setActiveTab(e.state.tab);
       } else {
@@ -1806,12 +1880,11 @@ export default function App() {
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [showQRScanner, showUPIPaymentModal]);
+  }, []);
 
   const handleTabChange = (tab: string) => {
     if (tab === 'scan') {
       setShowQRScanner(true);
-      window.history.pushState({ scanner: true }, '', '#scan');
       return;
     }
     setActiveTab(tab);
@@ -2264,7 +2337,18 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-surface text-on-surface font-sans selection:bg-primary selection:text-surface overflow-x-hidden">
+    <div className="min-h-screen bg-surface text-on-surface font-sans selection:bg-primary selection:text-surface overflow-x-hidden relative">
+      {/* Dynamic Ambient Blur Background Image */}
+      <div 
+        className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden bg-cover bg-center bg-no-repeat transition-all duration-500"
+        style={{ 
+          backgroundImage: 'url("/home_bg.png")', 
+          filter: 'blur(8px) brightness(0.35)',
+          transform: 'scale(1.15)',
+          transformOrigin: 'center'
+        }}
+      />
+
       <AnimatePresence>
         {isLocked && <AppLock savedPin={appPin} onUnlock={() => setIsLocked(false)} />}
       </AnimatePresence>
@@ -2276,7 +2360,13 @@ export default function App() {
         unreadCount={unreadNotifications}
       />
 
-      <main className="pt-24 px-4 pb-40 max-w-2xl mx-auto">
+      <main 
+        className="px-4 max-w-2xl mx-auto relative z-10"
+        style={{
+          paddingTop: 'calc(6rem + env(safe-area-inset-top, 0px))',
+          paddingBottom: 'calc(10rem + env(safe-area-inset-bottom, 0px))'
+        }}
+      >
         {activeTab === 'home' && (
           <HomeView
             profile={profile}
