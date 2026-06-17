@@ -88,6 +88,7 @@ import { ScanView } from './components/ScanView';
 import { LedgerView } from './components/LedgerView';
 import { SettingsView } from './components/SettingsView';
 import { CategoriesView } from './components/CategoriesView';
+import homePng from './home.jpeg';
 import { TransactionItem, formatCurrency } from './components/TransactionItem';
 import { CardStack } from './components/CardStack';
 import { UPI_APPS, CATEGORY_ICONS, AVAILABLE_BANKS, SMOOTH_TRANSITION, QUICK_TRANSITION, NO_DAMPING_TRANSITION, SPRING_CONFIG } from './components/constants';
@@ -555,7 +556,10 @@ const formatCurrencyOld = (amount: number | undefined, currency: string) => {
 // --- Components ---
 
 const TopAppBar = ({ profile, onProfileClick, onNotificationsClick, unreadCount }: { profile: UserProfile, onProfileClick: () => void, onNotificationsClick: () => void, unreadCount: number }) => (
-  <header className="fixed top-4 left-0 right-0 w-full flex justify-between px-6 z-50 will-change-transform">
+  <header 
+    className="fixed left-0 right-0 w-full flex justify-between px-6 z-50 will-change-transform" 
+    style={{ top: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
+  >
     <div 
       onClick={onProfileClick}
       className="glass-header rounded-full h-12 px-2 flex items-center shadow-[0px_0px_32px_rgba(186,158,255,0.08)] cursor-pointer active:scale-95 transition-transform"
@@ -735,7 +739,10 @@ const BottomNavBar = ({ activeTab, onTabChange }: { activeTab: string, onTabChan
       {/* Fade background to prevent accidental clicks and add depth */}
       <div className="absolute inset-x-0 bottom-0 h-32 glass-nav pointer-events-auto" />
       
-      <div className="relative flex justify-around items-center px-8 pb-10 pt-4 pointer-events-none">
+      <div 
+        className="relative flex justify-around items-center px-8 pt-4 pointer-events-none" 
+        style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}
+      >
         <div className="glass-capsule rounded-full w-full max-w-md h-16 flex justify-around items-center px-4 shadow-2xl pointer-events-auto border border-white/10">
           {tabs.map((tab) => (
             <button
@@ -2265,6 +2272,18 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-surface text-on-surface font-sans selection:bg-primary selection:text-surface overflow-x-hidden">
+      {/* Dynamic Homescreen Background with Safe Blurs */}
+      {activeTab === 'home' && (
+        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden select-none">
+          <div 
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-1000 transform scale-[1.02]"
+            style={{ backgroundImage: `url(${homePng})` }}
+          />
+          {/* Backdrop Blur tint layer to make standard text readable & make glassmorphism look ultra-rich */}
+          <div className="absolute inset-0 bg-black/55 backdrop-blur-[6px] transition-all duration-700" />
+        </div>
+      )}
+
       <AnimatePresence>
         {isLocked && <AppLock savedPin={appPin} onUnlock={() => setIsLocked(false)} />}
       </AnimatePresence>

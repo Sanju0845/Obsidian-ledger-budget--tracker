@@ -73,7 +73,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   return (
     <div className="space-y-8 animate-none">
       {/* Hero Liquidity Display with Glassy Ambient Backdrop */}
-      <section className="relative overflow-hidden rounded-[36px] bg-gradient-to-b from-surface-container-high/60 to-surface-container-low/40 p-8 border border-white/5 shadow-2xl">
+      <section className="relative overflow-hidden rounded-[36px] bg-white/[0.04] backdrop-blur-2xl p-8 border border-white/10 shadow-2xl">
         <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-primary/10 blur-[80px] pointer-events-none" />
         <div className="absolute -bottom-8 -left-8 w-40 h-40 rounded-full bg-secondary/10 blur-[60px] pointer-events-none" />
         
@@ -96,8 +96,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </div>
 
           {/* Stat Cards Row */}
-          <div className="grid grid-cols-2 gap-4 pt-3 border-t border-white/5">
-            <div className="flex items-center gap-3.5 bg-surface-container-low/40 p-3 rounded-2xl border border-white/5 group hover:bg-surface-container-low/80 transition-colors">
+          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
+            <div className="flex items-center gap-3.5 bg-white/[0.03] backdrop-blur-md p-3 rounded-2xl border border-white/5 group hover:bg-white/[0.06] transition-colors">
               <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-secondary transition-transform group-hover:scale-105">
                 <TrendingUp size={18} />
               </div>
@@ -107,7 +107,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-3.5 bg-surface-container-low/40 p-3 rounded-2xl border border-white/5 group hover:bg-surface-container-low/80 transition-colors">
+            <div className="flex items-center gap-3.5 bg-white/[0.03] backdrop-blur-md p-3 rounded-2xl border border-white/5 group hover:bg-white/[0.06] transition-colors">
               <div className="w-10 h-10 rounded-xl bg-error/10 flex items-center justify-center text-error transition-transform group-hover:scale-105">
                 <TrendingDown size={18} />
               </div>
@@ -143,9 +143,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <button 
           onClick={() => onTabChange('upi')}
-          className="relative overflow-hidden group rounded-2xl p-5 bg-gradient-to-b from-surface-container-high/60 to-surface-container-low/40 border border-primary/20 hover:border-primary/40 text-left transition-all hover:translate-y-[-2px] active:translate-y-0"
+          className="relative overflow-hidden group rounded-2xl p-5 bg-white/[0.03] backdrop-blur-xl border border-primary/20 hover:border-primary/40 text-left transition-all hover:translate-y-[-2px] active:translate-y-0"
         >
-          <div className="absolute right-[-10px] bottom-[-10px] text-primary/10 group-hover:scale-110 transition-transform">
+          <div className="absolute right-[-10px] bottom-[-10px] text-primary/15 group-hover:scale-110 transition-transform">
             <Wallet size={72} />
           </div>
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-3">
@@ -157,9 +157,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
         <button 
           onClick={() => setShowSmsModal(true)}
-          className="relative overflow-hidden group rounded-2xl p-5 bg-gradient-to-b from-surface-container-high/60 to-surface-container-low/40 border border-white/5 hover:border-white/12 text-left transition-all hover:translate-y-[-2px] active:translate-y-0"
+          className="relative overflow-hidden group rounded-2xl p-5 bg-white/[0.03] backdrop-blur-xl border border-white/10 hover:border-white/20 text-left transition-all hover:translate-y-[-2px] active:translate-y-0"
         >
-          <div className="absolute right-[-10px] bottom-[-10px] text-secondary/10 group-hover:scale-110 transition-transform">
+          <div className="absolute right-[-10px] bottom-[-10px] text-secondary/15 group-hover:scale-110 transition-transform">
             <Upload size={72} />
           </div>
           <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-secondary mb-3">
@@ -171,9 +171,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
         <button 
           onClick={() => setShowAddModal(true)}
-          className="relative overflow-hidden group rounded-2xl p-5 bg-gradient-to-b from-surface-container-high/60 to-surface-container-low/40 border border-white/5 hover:border-white/12 text-left transition-all hover:translate-y-[-2px] active:translate-y-0"
+          className="relative overflow-hidden group rounded-2xl p-5 bg-white/[0.03] backdrop-blur-xl border border-white/10 hover:border-white/20 text-left transition-all hover:translate-y-[-2px] active:translate-y-0"
         >
-          <div className="absolute right-[-10px] bottom-[-10px] text-tertiary/10 group-hover:scale-110 transition-transform">
+          <div className="absolute right-[-10px] bottom-[-10px] text-tertiary/15 group-hover:scale-110 transition-transform">
             <PlusCircle size={72} />
           </div>
           <div className="w-10 h-10 rounded-xl bg-tertiary/10 flex items-center justify-center text-tertiary mb-3">
@@ -185,9 +185,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
         <button 
           onClick={() => setShowManageCardsModal(true)}
-          className="relative overflow-hidden group rounded-2xl p-5 bg-gradient-to-b from-surface-container-high/60 to-surface-container-low/40 border border-white/5 hover:border-white/12 text-left transition-all hover:translate-y-[-2px] active:translate-y-0"
+          className="relative overflow-hidden group rounded-2xl p-5 bg-white/[0.03] backdrop-blur-xl border border-white/10 hover:border-white/20 text-left transition-all hover:translate-y-[-2px] active:translate-y-0"
         >
-          <div className="absolute right-[-10px] bottom-[-10px] text-emerald-400/10 group-hover:scale-110 transition-transform">
+          <div className="absolute right-[-10px] bottom-[-10px] text-emerald-400/15 group-hover:scale-110 transition-transform">
             <CreditCard size={72} />
           </div>
           <div className="w-10 h-10 rounded-xl bg-emerald-400/10 flex items-center justify-center text-emerald-400 mb-3">
@@ -267,7 +267,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             See all ledgers
           </span>
         </div>
-        <div className="space-y-1.5 rounded-3xl overflow-hidden border border-white/5 bg-surface-container-low/40 p-2">
+        <div className="space-y-1.5 rounded-3xl overflow-hidden border border-white/10 bg-white/[0.03] backdrop-blur-xl p-2.5">
           {filteredTransactions.length > 0 ? (
             filteredTransactions.slice(0, 4).map(tx => (
               <TransactionItem 
