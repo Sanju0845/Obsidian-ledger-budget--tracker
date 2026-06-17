@@ -111,56 +111,6 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
   const [newCatType, setNewCatType] = useState<'income' | 'expense'>('expense');
   const [newCatIcon, setNewCatIcon] = useState('Others');
 
-  // Synchronize selectedCategoryDetail and showAddModal with back button flow
-  const [catDetailPushed, setCatDetailPushed] = useState(false);
-  const [catModalPushed, setCatModalPushed] = useState(false);
-
-  React.useEffect(() => {
-    if (selectedCategoryDetail && !catDetailPushed) {
-      window.history.pushState({ catDetail: selectedCategoryDetail }, '', `#cat-detail-${selectedCategoryDetail}`);
-      setCatDetailPushed(true);
-    } else if (!selectedCategoryDetail && catDetailPushed) {
-      if (window.history.state && window.history.state.catDetail) {
-        window.history.back();
-      }
-      setCatDetailPushed(false);
-    }
-  }, [selectedCategoryDetail, catDetailPushed]);
-
-  React.useEffect(() => {
-    if (showAddModal && !catModalPushed) {
-      window.history.pushState({ catModal: true }, '', '#cat-modal');
-      setCatModalPushed(true);
-    } else if (!showAddModal && catModalPushed) {
-      if (window.history.state && window.history.state.catModal) {
-        window.history.back();
-      }
-      setCatModalPushed(false);
-    }
-  }, [showAddModal, catModalPushed]);
-
-  React.useEffect(() => {
-    const handlePop = (e: PopStateEvent) => {
-      if (e.state && e.state.catDetail) {
-        setSelectedCategoryDetail(e.state.catDetail);
-        setCatDetailPushed(true);
-      } else {
-        setSelectedCategoryDetail(null);
-        setCatDetailPushed(false);
-      }
-      
-      if (e.state && e.state.catModal) {
-        setShowAddModal(true);
-        setCatModalPushed(true);
-      } else {
-        setShowAddModal(false);
-        setCatModalPushed(false);
-      }
-    };
-    window.addEventListener('popstate', handlePop);
-    return () => window.removeEventListener('popstate', handlePop);
-  }, []);
-
   // Trigger toast helper
   const triggerToast = (message: string, sub: string) => {
     setToast({ show: true, message, sub });

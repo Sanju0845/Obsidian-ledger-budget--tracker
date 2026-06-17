@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   ResponsiveContainer, 
   AreaChart, 
@@ -62,35 +62,6 @@ export const BudgetView: React.FC<BudgetViewProps> = ({
   // Local state to track currently selected Detailed Budget view (Image 3)
   const [selectedDetailCat, setSelectedDetailCat] = useState<string | null>(null);
   const [showOptionsId, setShowOptionsId] = useState<string | null>(null);
-
-  // Synchronize selectedDetailCat with phone back button flow
-  const [budgetDetailPushed, setBudgetDetailPushed] = useState(false);
-
-  useEffect(() => {
-    if (selectedDetailCat && !budgetDetailPushed) {
-      window.history.pushState({ budgetDetail: selectedDetailCat }, '', `#budget-detail-${selectedDetailCat}`);
-      setBudgetDetailPushed(true);
-    } else if (!selectedDetailCat && budgetDetailPushed) {
-      if (window.history.state && window.history.state.budgetDetail) {
-        window.history.back();
-      }
-      setBudgetDetailPushed(false);
-    }
-  }, [selectedDetailCat, budgetDetailPushed]);
-
-  useEffect(() => {
-    const handlePop = (e: PopStateEvent) => {
-      if (e.state && e.state.budgetDetail) {
-        setSelectedDetailCat(e.state.budgetDetail);
-        setBudgetDetailPushed(true);
-      } else {
-        setSelectedDetailCat(null);
-        setBudgetDetailPushed(false);
-      }
-    };
-    window.addEventListener('popstate', handlePop);
-    return () => window.removeEventListener('popstate', handlePop);
-  }, []);
 
   const chartData = useMemo(() => {
     const groups: Record<string, { date: string, income: number, expense: number }> = {};

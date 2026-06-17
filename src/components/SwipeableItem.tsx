@@ -78,10 +78,6 @@ export const SwipeableItem: React.FC<SwipeableItemProps> = ({
         onDragEnd={handleDragEnd}
         whileTap={{ cursor: 'grabbing' }}
         className="relative z-10"
-        style={{ 
-          willChange: 'transform',
-          touchAction: 'pan-y'
-        }}
       >
         {children}
       </motion.div>

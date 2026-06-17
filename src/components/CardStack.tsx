@@ -30,6 +30,7 @@ export const CardStack: React.FC<CardStackProps> = React.memo(({
             return (
               <motion.div
                 key={card.id}
+                layoutId={card.id}
                 className={cn(
                   "absolute inset-0 h-52 rounded-2xl p-6 flex flex-col justify-between card-shadow-glow border border-white/10",
                   "bg-gradient-to-br",
@@ -39,23 +40,19 @@ export const CardStack: React.FC<CardStackProps> = React.memo(({
                 animate={{ 
                   scale: 1 - relIdx * 0.05, 
                   opacity: 1 - relIdx * 0.5,
-                  y: relIdx * -12,
+                  y: relIdx * -15,
                   zIndex: cards.length - relIdx,
-                  rotate: relIdx * 0.5
+                  rotate: relIdx * 1
                 }}
-                transition={{ type: 'tween', ease: 'easeOut', duration: 0.2 }}
-                exit={{ x: -250, opacity: 0, transition: { duration: 0.15, ease: 'easeIn' } }}
+                transition={{ duration: 0.3 }}
+                exit={{ x: -200, opacity: 0, transition: { duration: 0.2 } }}
                 drag={relIdx === 0 ? "x" : false}
                 dragConstraints={{ left: 0, right: 0 }}
                 onDragEnd={(_, info) => {
                   if (info.offset.x > 80) onSwipe(-1);
                   else if (info.offset.x < -80) onSwipe(1);
                 }}
-                style={{ 
-                  cursor: relIdx === 0 ? 'grab' : 'default',
-                  willChange: 'transform, opacity',
-                  touchAction: relIdx === 0 ? 'pan-y' : 'auto'
-                }}
+                style={{ cursor: relIdx === 0 ? 'grab' : 'default' }}
               >
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-3">
